@@ -17,7 +17,7 @@ The tools and programs for DWEL data analysis here are written and developed in 
 
 Programs are grouped into different folders based on their functionality and data categories they are fed with. *Folders keep growing and more tools will be added.* The current folders and description of their functionality and purposes are listed in the following sections.
 
-## dwel-wf-analysis
+## 1. dwel-wf-analysis
 
 Programs that take in and process DWEL waveform data stored in *ENVI data cube*.
 
@@ -28,11 +28,11 @@ Programs that take in and process DWEL waveform data stored in *ENVI data cube*.
 ### *To be filled*. 
 (Gap probability from calibrated waveforms for leaves and woody materials together and separately.)
 
-## dwel-points-analysis
+## 2. dwel-points-analysis
 
 Programs that take in and process DWEL point cloud data stored in *discrete points*. The point cloud data can be directly from IDL DWEL preprocessing programs or from some experimental waveform decomposition functions in the folder of *dwel-wf-analysis*. 
 
-### dwel-points-classifier
+### 2.1. dwel-points-classifier
 
 + Generate single point cloud with dual-wavelength intensities from DWEL point cloud files. 
 + Classify points in dual-wavelength point cloud with intensity information by, 
@@ -42,30 +42,30 @@ Programs that take in and process DWEL point cloud data stored in *discrete poin
 + Classify points in single-wavelength point cloud with pulse shape information by,  
   - Thresholding ratio of peak intensity to FWHM of a return pulse that gives a point.
 
-### dwel-dual-pgap-estimator
+### 2.2. dwel-dual-pgap-estimator
 
 + Estimate gap probability (Pgap) from DWEL *discrete ponits*.
   - Pgap of all vegetation elements from unclassified points. 
   - Pgap of leaves and woody materials separately from classified points.
 
-### dwel-point-cloud-registration
+### 2.3. dwel-point-cloud-registration
 
 + *To be filled*. Functions to help registration of multiple point cloud. At present we don't have a fully automatic registration algorithm. But some functions here will help manual registration. 
 + *To be filled*. Functions to write registered and merged point cloud of a whole forest site from several scans. The output point cloud will be fed to Pasi's quantitative structure modeling (QSM) to generate tree models and estimate tree volume. 
 
-## dwel-projected-image-analysis
+## 3. dwel-projected-image-analysis
 
 Programs that take in and process projected images of either waveforms or discrete points from DWEL. 
 
 ### *To be filled*
 
-## dwel-pgap2profile
+## 4. dwel-pgap2profile
 
 Programs that take in total or classified Pgap from DWEL data and process them to canopy structural parameters, such as area index, foliage profile, clumping index and etc.. for total vegetation elements or for leaves and woody materials separately. 
 
 ### *to be filled*
 
-## dwel-data-utils
+## 5. dwel-data-utils
 
 Programs that are not specific for DWEL's dual-wavelength data but universal for any lidar waveform and point cloud. 
 
