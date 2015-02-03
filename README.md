@@ -21,9 +21,12 @@ Programs are grouped into different folders based on their functionality and dat
 
 Programs that take in and process DWEL waveform data stored in *ENVI data cube*.
 
-### *To be filled*. Analysis of waveform data out of IDL programs of DWEL waveform preprocessing. 
-### *To be filled*. Experimental algorithms of DWEL waveform filtering and decomposition to improve noise removal and point cloud generation. 
-### *To be filled*. Gap probability from calibrated waveforms for leaves and woody materials together and separately.
+### *To be filled*. 
+(Analysis of waveform data out of IDL programs of DWEL waveform preprocessing.)
+### *To be filled*. 
+(Experimental algorithms of DWEL waveform filtering and decomposition to improve noise removal and point cloud generation.)
+### *To be filled*. 
+(Gap probability from calibrated waveforms for leaves and woody materials together and separately.)
 
 ## dwel-points-analysis
 
@@ -96,6 +99,6 @@ MATLAB (R2013a :()
 
 # Contribution
 
-** Helps are definitely welcome and needed! **
+**Helps are definitely welcome and needed!**
 
 Zhan Li, zhanli86@bu.edu
