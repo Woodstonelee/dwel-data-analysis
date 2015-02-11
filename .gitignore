@@ -52,3 +52,10 @@ docs/_build/
 
 # PyBuilder
 target/
+
+# BU scc server batch job output
+*.e*
+*.o*
+*.pe*
+*.po*
+*.png
