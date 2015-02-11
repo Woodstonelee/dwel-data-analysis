@@ -37,8 +37,8 @@ Programs that take in and process DWEL point cloud data stored in *discrete poin
 + Generate single point cloud with dual-wavelength intensities from DWEL point cloud files. 
 + Classify points in dual-wavelength point cloud with intensity information by, 
   - Simple normalized difference index (NDI) thresholding. 
-  - Maximum likeliehood (ML) classifier.
-  - Random forest (RF) classifier. 
+  - Unsupervised clustering classifier.
+  - Supervised Random Forest (RF) classifier. 
 + Classify points in single-wavelength point cloud with pulse shape information by,  
   - Thresholding ratio of peak intensity to FWHM of a return pulse that gives a point.
 
