@@ -429,7 +429,7 @@ def main(cmdargs):
     headerlines = 3
     # column indices for some records used here, with 0 as the first.
     cind = {'range':8, 'sample':12, 'line':13, 'x':0, 'y':1, 'z':2, 'd_I':3, \
-                'shot_number':6, 'theta':9, 'phi':10, 'fwhm':15}
+                'shot_number':6, 'theta':9, 'phi':10, 'fwhm':16}
     ind = [cind['x'], cind['y'], cind['z'], cind['d_I'], cind['shot_number'], cind['range'], cind['theta'], \
                cind['phi'], cind['sample'], cind['line'], cind['fwhm']]
     
@@ -450,8 +450,14 @@ def main(cmdargs):
     
     # read points from text file
     print "Loading points"
-    nirpoints = np.loadtxt(nirfile, dtype=np.float32, usecols=ind, delimiter=',', skiprows=headerlines)
-    swirpoints = np.loadtxt(swirfile, dtype=np.float32, usecols=ind, delimiter=',', skiprows=headerlines)
+    nirpoints = np.genfromtxt(nirfile, dtype=np.float32, usecols=ind, \
+                                  delimiter=',', skiprows=headerlines, \
+                                  filling_values=np.nan, usemask=False)
+    swirpoints = np.genfromtxt(swirfile, dtype=np.float32, usecols=ind, \
+                                  delimiter=',', skiprows=headerlines, \
+                                  filling_values=np.nan, usemask=False)
+#    nirpoints = np.loadtxt(nirfile, dtype=np.float32, usecols=ind, delimiter=',', skiprows=headerlines)
+#    swirpoints = np.loadtxt(swirfile, dtype=np.float32, usecols=ind, delimiter=',', skiprows=headerlines)
 
     # update column index in loaded array
     cind = {'x':0, 'y':1, 'z':2, 'd_I':3, 'shot_number':4, 'range':5, \
@@ -524,9 +530,9 @@ class CmdArgs:
     def __init__(self):
         p = optparse.OptionParser()
 
-        p.add_option("-n", "--nir", dest="nirfile", default="/projectnb/echidna/lidar/DWEL_Processing/HF2014/tmp-test-data/HFHD_20140919_C_1064_cube_bsfix_pxc_update_atp2_sdfac2_sievefac10_ptcl_points.txt", help="Input point cloud file of NIR band")
-        p.add_option("-s", "--swir", dest="swirfile", default="/projectnb/echidna/lidar/DWEL_Processing/HF2014/tmp-test-data/HFHD_20140919_C_1548_cube_bsfix_pxc_update_atp2_sdfac2_sievefac10_ptcl_points.txt", help="Input point cloud file of SWIR band")
-        p.add_option("-o", "--output", dest="outfile", default="/projectnb/echidna/lidar/DWEL_Processing/HF2014/tmp-test-data/HFHD_20140919_C_dual_cube_bsfix_pxc_update_atp2_sdfac2_sievefac10_ptcl_points.txt", help="Output dual-wavelength point cloud file")
+        p.add_option("-n", "--nir", dest="nirfile", default="/projectnb/echidna/lidar/DWEL_Processing/HF2014/Hardwood20140919/HFHD_20140919_C/HFHD_20140919_C_1064_cube_bsfix_pxc_update_atp2_ptcl_points.txt", help="Input point cloud file of NIR band")
+        p.add_option("-s", "--swir", dest="swirfile", default="/projectnb/echidna/lidar/DWEL_Processing/HF2014/Hardwood20140919/HFHD_20140919_C/HFHD_20140919_C_1548_cube_bsfix_pxc_update_atp2_ptcl_points.txt", help="Input point cloud file of SWIR band")
+        p.add_option("-o", "--output", dest="outfile", default="/projectnb/echidna/lidar/DWEL_Processing/HF2014/tmp-test-data/HFHD_20140919_C_dual_cube_bsfix_pxc_update_atp2_ptcl_points.txt", help="Output dual-wavelength point cloud file")
 
 
         # p.add_option("-n", "--nir", dest="nirfile", default=None, help="Input point cloud file of NIR band")

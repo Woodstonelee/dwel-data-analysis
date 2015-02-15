@@ -51,7 +51,8 @@ from scipy import stats as spstats
 from osgeo import gdal
 
 import matplotlib as mpl
-mpl.use('TkAgg')
+# mpl.use('TkAgg')
+mpl.use('Agg')
 import matplotlib.pyplot as plt
 
 gdal.AllRegister()
@@ -442,6 +443,9 @@ def dwel_points2hsproj(infile, outfile, \
         # go to next hemi-image pixel
         p += ptsoutcounts[p]
 
+    # before export the image, transpose the array so that it conforms with the
+    # view from bottom to up
+    outimage = np.transpose(outimage)
     # export image resolution
     dpi = 72
     # get image size

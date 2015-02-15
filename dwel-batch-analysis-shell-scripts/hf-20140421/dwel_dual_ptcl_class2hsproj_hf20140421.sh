@@ -5,32 +5,22 @@
 #$ -N dwel-clspts2hs-hf20140421
 #$ -V
 #$ -m ae
-#$ -t 1-10
+#$ -t 1-5
 
 CLSPTSFILES=( \
-"/projectnb/echidna/lidar/DWEL_Processing/HF2014/Hardwood20140421/HFHD20140421-dual-points-class-by-ndi/HFHD_20140421_C_dual_cube_bsfix_pxc_update_atp2_sdfac2_sievefac9_ptcl_points_class_NDI_thresh_-0.208.txt" \
-"/projectnb/echidna/lidar/DWEL_Processing/HF2014/Hardwood20140421/HFHD20140421-dual-points-class-by-ndi/HFHD_20140421_E_dual_cube_bsfix_pxc_update_atp2_sdfac2_sievefac9_ptcl_points_class_NDI_thresh_-0.208.txt" \
-"/projectnb/echidna/lidar/DWEL_Processing/HF2014/Hardwood20140421/HFHD20140421-dual-points-class-by-ndi/HFHD_20140421_N_dual_cube_bsfix_pxc_update_atp2_sdfac2_sievefac9_ptcl_points_class_NDI_thresh_-0.208.txt" \
-"/projectnb/echidna/lidar/DWEL_Processing/HF2014/Hardwood20140421/HFHD20140421-dual-points-class-by-ndi/HFHD_20140421_S_dual_cube_bsfix_pxc_update_atp2_sdfac2_sievefac9_ptcl_points_class_NDI_thresh_-0.208.txt" \
-"/projectnb/echidna/lidar/DWEL_Processing/HF2014/Hardwood20140421/HFHD20140421-dual-points-class-by-ndi/HFHD_20140421_W_dual_cube_bsfix_pxc_update_atp2_sdfac2_sievefac9_ptcl_points_class_NDI_thresh_-0.208.txt" \
-"/projectnb/echidna/lidar/DWEL_Processing/HF2014/Hardwood20140421/HFHD20140421-dual-points-class-by-sr/HFHD_20140421_C_dual_cube_bsfix_pxc_update_atp2_sdfac2_sievefac9_ptcl_points_class_SR_thresh_3.700.txt" \
-"/projectnb/echidna/lidar/DWEL_Processing/HF2014/Hardwood20140421/HFHD20140421-dual-points-class-by-sr/HFHD_20140421_E_dual_cube_bsfix_pxc_update_atp2_sdfac2_sievefac9_ptcl_points_class_SR_thresh_3.700.txt" \
-"/projectnb/echidna/lidar/DWEL_Processing/HF2014/Hardwood20140421/HFHD20140421-dual-points-class-by-sr/HFHD_20140421_N_dual_cube_bsfix_pxc_update_atp2_sdfac2_sievefac9_ptcl_points_class_SR_thresh_3.700.txt" \
-"/projectnb/echidna/lidar/DWEL_Processing/HF2014/Hardwood20140421/HFHD20140421-dual-points-class-by-sr/HFHD_20140421_S_dual_cube_bsfix_pxc_update_atp2_sdfac2_sievefac9_ptcl_points_class_SR_thresh_3.700.txt" \
-"/projectnb/echidna/lidar/DWEL_Processing/HF2014/Hardwood20140421/HFHD20140421-dual-points-class-by-sr/HFHD_20140421_W_dual_cube_bsfix_pxc_update_atp2_sdfac2_sievefac9_ptcl_points_class_SR_thresh_3.700.txt" \
+"/projectnb/echidna/lidar/DWEL_Processing/HF2014/Hardwood20140421/HFHD20140421-dual-points-class-by-ndi/HFHD_20140421_C_dual_cube_bsfix_pxc_update_atp2_sdfac2_sievefac9_ptcl_points_class_NDI_thresh_-0.154.txt" \
+"/projectnb/echidna/lidar/DWEL_Processing/HF2014/Hardwood20140421/HFHD20140421-dual-points-class-by-ndi/HFHD_20140421_E_dual_cube_bsfix_pxc_update_atp2_sdfac2_sievefac9_ptcl_points_class_NDI_thresh_-0.154.txt" \
+"/projectnb/echidna/lidar/DWEL_Processing/HF2014/Hardwood20140421/HFHD20140421-dual-points-class-by-ndi/HFHD_20140421_N_dual_cube_bsfix_pxc_update_atp2_sdfac2_sievefac9_ptcl_points_class_NDI_thresh_-0.154.txt" \
+"/projectnb/echidna/lidar/DWEL_Processing/HF2014/Hardwood20140421/HFHD20140421-dual-points-class-by-ndi/HFHD_20140421_S_dual_cube_bsfix_pxc_update_atp2_sdfac2_sievefac9_ptcl_points_class_NDI_thresh_-0.154.txt" \
+"/projectnb/echidna/lidar/DWEL_Processing/HF2014/Hardwood20140421/HFHD20140421-dual-points-class-by-ndi/HFHD_20140421_W_dual_cube_bsfix_pxc_update_atp2_sdfac2_sievefac9_ptcl_points_class_NDI_thresh_-0.154.txt" \
 )
 
 HSPRJFILES=( \
-"/projectnb/echidna/lidar/DWEL_Processing/HF2014/Hardwood20140421/HFHD20140421-dual-points-class-by-ndi/HFHD_20140421_C_dual_cube_bsfix_pxc_update_atp2_sdfac2_sievefac9_ptcl_points_class_NDI_thresh_-0.208_hsp2.img" \
-"/projectnb/echidna/lidar/DWEL_Processing/HF2014/Hardwood20140421/HFHD20140421-dual-points-class-by-ndi/HFHD_20140421_E_dual_cube_bsfix_pxc_update_atp2_sdfac2_sievefac9_ptcl_points_class_NDI_thresh_-0.208_hsp2.img" \
-"/projectnb/echidna/lidar/DWEL_Processing/HF2014/Hardwood20140421/HFHD20140421-dual-points-class-by-ndi/HFHD_20140421_N_dual_cube_bsfix_pxc_update_atp2_sdfac2_sievefac9_ptcl_points_class_NDI_thresh_-0.208_hsp2.img" \
-"/projectnb/echidna/lidar/DWEL_Processing/HF2014/Hardwood20140421/HFHD20140421-dual-points-class-by-ndi/HFHD_20140421_S_dual_cube_bsfix_pxc_update_atp2_sdfac2_sievefac9_ptcl_points_class_NDI_thresh_-0.208_hsp2.img" \
-"/projectnb/echidna/lidar/DWEL_Processing/HF2014/Hardwood20140421/HFHD20140421-dual-points-class-by-ndi/HFHD_20140421_W_dual_cube_bsfix_pxc_update_atp2_sdfac2_sievefac9_ptcl_points_class_NDI_thresh_-0.208_hsp2.img" \
-"/projectnb/echidna/lidar/DWEL_Processing/HF2014/Hardwood20140421/HFHD20140421-dual-points-class-by-sr/HFHD_20140421_C_dual_cube_bsfix_pxc_update_atp2_sdfac2_sievefac9_ptcl_points_class_SR_thresh_3.700_hsp2.img" \
-"/projectnb/echidna/lidar/DWEL_Processing/HF2014/Hardwood20140421/HFHD20140421-dual-points-class-by-sr/HFHD_20140421_E_dual_cube_bsfix_pxc_update_atp2_sdfac2_sievefac9_ptcl_points_class_SR_thresh_3.700_hsp2.img" \
-"/projectnb/echidna/lidar/DWEL_Processing/HF2014/Hardwood20140421/HFHD20140421-dual-points-class-by-sr/HFHD_20140421_N_dual_cube_bsfix_pxc_update_atp2_sdfac2_sievefac9_ptcl_points_class_SR_thresh_3.700_hsp2.img" \
-"/projectnb/echidna/lidar/DWEL_Processing/HF2014/Hardwood20140421/HFHD20140421-dual-points-class-by-sr/HFHD_20140421_S_dual_cube_bsfix_pxc_update_atp2_sdfac2_sievefac9_ptcl_points_class_SR_thresh_3.700_hsp2.img" \
-"/projectnb/echidna/lidar/DWEL_Processing/HF2014/Hardwood20140421/HFHD20140421-dual-points-class-by-sr/HFHD_20140421_W_dual_cube_bsfix_pxc_update_atp2_sdfac2_sievefac9_ptcl_points_class_SR_thresh_3.700_hsp2.img" \
+"/projectnb/echidna/lidar/DWEL_Processing/HF2014/Hardwood20140421/HFHD20140421-dual-points-class-by-ndi/HFHD_20140421_C_dual_cube_bsfix_pxc_update_atp2_sdfac2_sievefac9_ptcl_points_class_NDI_thresh_-0.154_hsp2.img" \
+"/projectnb/echidna/lidar/DWEL_Processing/HF2014/Hardwood20140421/HFHD20140421-dual-points-class-by-ndi/HFHD_20140421_E_dual_cube_bsfix_pxc_update_atp2_sdfac2_sievefac9_ptcl_points_class_NDI_thresh_-0.154_hsp2.img" \
+"/projectnb/echidna/lidar/DWEL_Processing/HF2014/Hardwood20140421/HFHD20140421-dual-points-class-by-ndi/HFHD_20140421_N_dual_cube_bsfix_pxc_update_atp2_sdfac2_sievefac9_ptcl_points_class_NDI_thresh_-0.154_hsp2.img" \
+"/projectnb/echidna/lidar/DWEL_Processing/HF2014/Hardwood20140421/HFHD20140421-dual-points-class-by-ndi/HFHD_20140421_S_dual_cube_bsfix_pxc_update_atp2_sdfac2_sievefac9_ptcl_points_class_NDI_thresh_-0.154_hsp2.img" \
+"/projectnb/echidna/lidar/DWEL_Processing/HF2014/Hardwood20140421/HFHD20140421-dual-points-class-by-ndi/HFHD_20140421_W_dual_cube_bsfix_pxc_update_atp2_sdfac2_sievefac9_ptcl_points_class_NDI_thresh_-0.154_hsp2.img" \
 )
 
 PYCMD="/usr3/graduate/zhanli86/Programs/dwel-data-analysis/dwel-data-utils/dwel_points2hsproj.py"

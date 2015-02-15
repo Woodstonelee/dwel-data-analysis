@@ -20,6 +20,7 @@ import time
 import optparse
 
 import numpy as np
+import scipy as sp
 import scipy.stats as spstats
 import scipy.optimize as spopt
 from sklearn import mixture
@@ -30,6 +31,8 @@ import matplotlib as mpl
 mpl.use('Agg') # for non-interactive plotting running in batch job
 import matplotlib.pyplot as plt
 from matplotlib import gridspec
+
+import seaborn as sns
 
 def gauss2(x, *p):
     """
@@ -101,6 +104,8 @@ def dwel_points_class_index(infile, outfile, idxname, thresh=None, \
         flag = np.greater(dualpoints[:, cind['d_I_swir']], 1*i_scale)
         dualpoints[flag, cind['d_I_swir']:cind['d_I_swir']+1] = 1*i_scale
 
+    ptsweights = (dualpoints[:, cind['range']]**2)
+    
     if verbose:
         # plot NIR and SWIR intensities on a scatter plot
 
@@ -127,6 +132,8 @@ def dwel_points_class_index(infile, outfile, idxname, thresh=None, \
         axHexbin = plt.subplot(gs[0:3, 1:4])
         hb = plt.hexbin(dualpoints[:, cind['d_I_nir']], \
                       dualpoints[:, cind['d_I_swir']], \
+                            C=ptsweights, \
+                            reduce_C_function=np.sum, \
                             extent=[nirplotrange[0], nirplotrange[1], \
                                         swirplotrange[0], nirplotrange[1]], \
                             mincnt=1)
@@ -147,7 +154,7 @@ def dwel_points_class_index(infile, outfile, idxname, thresh=None, \
         #                      0.01*i_scale)
         bins = np.arange(nirplotrange[0], nirplotrange[1], 0.01*i_scale)
         plt.hist(dualpoints[:, cind['d_I_nir']], bins, normed=True, \
-                     label="NIR histogram", edgecolor='None')
+                     label="NIR histogram", edgecolor='None', weights=ptsweights)
         #axHistNir.set_xlim( axHexbin.get_xlim() )
         plt.xlabel(r"NIR $\rho_{app}$*"+"{0:g}".format(i_scale))
         axHistSwir = plt.subplot(gs[0:3, 0], sharey=axHexbin)
@@ -157,7 +164,7 @@ def dwel_points_class_index(infile, outfile, idxname, thresh=None, \
         bins = np.arange(swirplotrange[0], swirplotrange[1], 0.01*i_scale)
         plt.hist(dualpoints[:, cind['d_I_swir']], bins, normed=True, \
                      label="SWIR histogram", edgecolor='None', \
-                     orientation='horizontal')
+                     orientation='horizontal', weights=ptsweights)
         #plt.ylim( axHexbin.get_ylim() )
         plt.ylabel(r"SWIR $\rho_{app}$*"+"{0:g}".format(i_scale))
 
@@ -220,25 +227,92 @@ def dwel_points_class_index(infile, outfile, idxname, thresh=None, \
     # model_sindex = gmm_sindex.fit(sindex)
     # aic_sindex = gmm_sindex.aic(sindex)
     if verbose:
+        # plt.gcf().set_size_inches((11, 7.5))
         # plot histogram and estimate a threshold from histogram
         if idxname.upper() == "NDI":
             bins = np.arange(-1.0, 1.0, 0.01)
+            snsylim = (-1.0, 1.0)
         elif idxname.upper() == "SR":
             bins = np.arange(0, 10.0, 0.01)
+            snsylim = (0, 10.0)
+        # plot hexbin of spectral index against range to observe any range
+        # dependence.
+        with sns.axes_style("white"):
+            sns.jointplot(dualpoints[:, cind['range']].squeeze(), \
+                              sindex.squeeze(), kind="hex", size=11, \
+                              ylim=snsylim, xlim=(0, 35), \
+                              marginal_kws={"norm_hist":True});
+            plt.savefig(infile[:-4]+"_hexbin_range_vs_"+idxname.lower()+".png")
         #bins = np.arange(np.nanmin(sindex), np.nanmax(sindex), 0.01)
         # # get the GMM fitting results.
         # logprob, respon = model_sindex.score_samples(bins)
         # pdf = np.exp(logprob)
         # pdf_isindexvidual = respon * pdf[:, np.newaxis]
         # plotting
+
+        # plot cumulative curve and find the minimum of second
+        # derivative. This follows Xiaoyuan's method to classify points with
+        # pulse shapes.
         histfig = plt.figure()
-        sindexhist = plt.hist(sindex, bins, normed=True, label="Histogram", edgecolor='None')
+        ax = plt.subplot(111)
+        sindexhist = plt.hist(sindex, bins, normed=True, label="Cumulative histogram", \
+                                  edgecolor='None', weights=ptsweights, cumulative=True)
         sindexfreq = sindexhist[0]
         bins = sindexhist[1]
         bins = (bins[:-1] + bins[1:])/2.0
+        # find the 5% and 95% percentile
+        interpfunc = sp.interpolate.interp1d(sindexfreq, bins)
+        lpercentile = interpfunc(0.05)
+        rpercentile = interpfunc(0.95)
+        lpercentile = np.asscalar(lpercentile)
+        rpercentile = np.asscalar(rpercentile)
+        # calculate second derivative
+        # first smooth the cumulative curve
+        smwidth = 5
+        smwindow = np.ones(smwidth)/float(smwidth)
+        tmppad = np.hstack((np.ones(smwidth/2)*np.mean(sindexfreq[0:smwidth]), \
+                      sindexfreq, \
+                      np.ones(smwidth/2)*np.mean(sindexfreq[-1*smwidth:-1])))
+        smsindexfreq = np.convolve(tmppad, smwindow, 'same')
+        smsindexfreq = smsindexfreq[(smwidth/2):-1*(smwidth/2)]
+
+        padbins = np.hstack((bins, bins[-1]+bins[1]-bins[0], \
+                                 bins[-1]+2*(bins[1]-bins[0])))
+        padsmsindexfreq = np.hstack((smsindexfreq, smsindexfreq[-1], smsindexfreq[-1]))
+        deriv1d = np.diff(padsmsindexfreq)/np.diff(padbins)
+        deriv2d = np.diff(deriv1d)/np.diff(padbins[:-1])
+        mind2ind = np.argmin(deriv2d)
+        mind2pos = bins[mind2ind]
+        # draw a line
+        plt.plot([mind2pos, mind2pos], ax.get_ylim(), 'k-')
+        ax.annotate("min. 2nd derivative: {0:.3f}".format(mind2pos), \
+                        xy=(mind2pos, sindexfreq[mind2ind]), \
+                        xytext=(mind2pos, sindexfreq[mind2ind]))
+        plt.title("Cumulative histogram of "+idxname.upper()+" from apparent reflectance")
+        plt.xlabel(idxname.upper())
+        plt.ylabel("Cumulative normalized frequency")
+        plt.legend(prop={'size':8}, loc='best')
+        plt.savefig(infile[:-4]+"_"+idxname.upper()+"_cumuhist.png")
+        plt.close(histfig)
+
+        histfig = plt.figure()
+        ax = plt.subplot(111)
+        sindexhist = plt.hist(sindex, bins, normed=True, label="Histogram", \
+                                  edgecolor='None', weights=ptsweights)
+        sindexfreq = sindexhist[0]
+        bins = sindexhist[1]
+        bins = (bins[:-1] + bins[1:])/2.0
+
+        # draw a line
+        plt.plot([mind2pos, mind2pos], ax.get_ylim(), 'k-')
+        ax.annotate("min. 2nd derivative: {0:.3f}".format(mind2pos), \
+                        xy=(mind2pos, sindexfreq[mind2ind]), \
+                        xytext=(mind2pos, sindexfreq[mind2ind]))
+
         plt.title("Histogram of "+idxname.upper()+" from apparent reflectance")
         plt.xlabel(idxname.upper())
         plt.ylabel("Normalized frequency")
+
         # simply fit a curve of two-Gaussians to the probability density
         tmpind = np.argmax(sindexfreq)
         tmpind2 = tmpind - 10
@@ -272,37 +346,37 @@ def dwel_points_class_index(infile, outfile, idxname, thresh=None, \
             estthresh = spopt.fsolve(func, (gpars[1]+gpars[4])/2.0)
             estthresh = estthresh[0]
             print "Estimate index threshold from data: "+"{0:.3f}".format(estthresh)
-            # classification with estimate threshold from histogram
-            pointlabel = np.ones_like(sindex, dtype=np.int)
-            flag = np.greater_equal(sindex, estthresh)
-            # leavs labeled as 2
-            pointlabel[flag] = 2
-            # write classification results
-            pointlabel = pointlabel.reshape(len(pointlabel), 1)
-            sindex = sindex.reshape(len(sindex), 1)
-            # generate RGB info
-            rgb = np.zeros((len(pointlabel), 3))
-            ind = np.where(pointlabel == 1)[0]
-            rgb[ind, :]=[255, 0, 0]
-            ind = np.where(pointlabel == 2)[0]
-            rgb[ind, :]=[0, 255, 0]
-            prefixstr = "[DWEL Dual-wavelength Point Cloud Classification " \
-                + idxname.upper()+". Label, 1=others, 2=leaves] " \
-                + "[Estimate threshold = "+"{0:.3f}".format(estthresh)+"]\n" \
-                + "Run made at: " + time.strftime("%c")+"\n"
-            headerstr = prefixstr + "x,y,z,d_I_nir,d_I_swir,shot_number,range,theta," \
-                +"phi,sample,line,fwhm_nir,fwhm_swir,multi-return,sindex,label,R,G,B"
-            # write to file
-            print "Saving classification by estimate threshold"
-            fmtstr = "%.3f "*5 + "%d " + "%.3f "*3 + "%d "*2 + "%.3f "*2 + "%d " \
-                + "%.3f " + "%d "*4
-            fmtstr = fmtstr.strip().split(" ")
-            np.savetxt(outfile[:-4]+"_"+idxname.upper() \
-                           + "_estthresh_"+"{0:.3f}".format(estthresh)+".txt", \
-                           np.hstack((dualpoints, sindex, pointlabel, rgb)), \
-                           delimiter=',', \
-                           fmt=fmtstr, \
-                           header=headerstr.rstrip())
+            # # classification with estimate threshold from histogram
+            # pointlabel = np.ones_like(sindex, dtype=np.int)
+            # flag = np.greater_equal(sindex, estthresh)
+            # # leavs labeled as 2
+            # pointlabel[flag] = 2
+            # # write classification results
+            # pointlabel = pointlabel.reshape(len(pointlabel), 1)
+            # sindex = sindex.reshape(len(sindex), 1)
+            # # generate RGB info
+            # rgb = np.zeros((len(pointlabel), 3))
+            # ind = np.where(pointlabel == 1)[0]
+            # rgb[ind, :]=[255, 0, 0]
+            # ind = np.where(pointlabel == 2)[0]
+            # rgb[ind, :]=[0, 255, 0]
+            # prefixstr = "[DWEL Dual-wavelength Point Cloud Classification " \
+            #     + idxname.upper()+". Label, 1=others, 2=leaves] " \
+            #     + "[Estimate threshold = "+"{0:.3f}".format(estthresh)+"]\n" \
+            #     + "Run made at: " + time.strftime("%c")+"\n"
+            # headerstr = prefixstr + "x,y,z,d_I_nir,d_I_swir,shot_number,range,theta," \
+            #     +"phi,sample,line,fwhm_nir,fwhm_swir,multi-return,sindex,label,R,G,B"
+            # # write to file
+            # print "Saving classification by estimate threshold"
+            # fmtstr = "%.3f "*5 + "%d " + "%.3f "*3 + "%d "*2 + "%.3f "*2 + "%d " \
+            #     + "%.3f " + "%d "*4
+            # fmtstr = fmtstr.strip().split(" ")
+            # np.savetxt(outfile[:-4]+"_"+idxname.upper() \
+            #                + "_estthresh_"+"{0:.3f}".format(estthresh)+".txt", \
+            #                np.hstack((dualpoints, sindex, pointlabel, rgb)), \
+            #                delimiter=',', \
+            #                fmt=fmtstr, \
+            #                header=headerstr.rstrip())
         finally:
             # write histogram and fitted pdf to a file if Gaussian fitting
             # failed, then the column for fitting is all zeros.
@@ -314,6 +388,8 @@ def dwel_points_class_index(infile, outfile, idxname, thresh=None, \
                 "Run made at: "+time.strftime("%c")+"\n"+ \
                 "Estimate threshold from fitted histogram curve = "+ \
                 "{0:.3f}".format(estthresh)+"\n"+ \
+                "5% percentile = {0:.3f}\n".format(lpercentile) + \
+                "95% percentile = {0:.3f}\n".format(rpercentile) + \
                 "bin_center,hist_data,hist_fit"
             np.savetxt(infile[:-4]+"_"+idxname.upper()+"_hist.txt", tmpout, \
                            delimiter=',', header=headerstr.rstrip(), \
@@ -361,11 +437,11 @@ class CmdArgs:
     def __init__(self):
         p = optparse.OptionParser()
 
-        # p.add_option("-i", "--input", dest="infile", default="/projectnb/echidna/lidar/DWEL_Processing/HF2014/tmp-test-data/HFHD_20140919_C_dual_cube_bsfix_pxc_update_atp2_sdfac2_sievefac10_ptcl_points.txt", help="Input dual-wavelength point cloud file")
-        # p.add_option("-o", "--output", dest="outfile", default="/projectnb/echidna/lidar/DWEL_Processing/HF2014/tmp-test-data/HFHD_20140919_C_dual_cube_bsfix_pxc_update_atp2_sdfac2_sievefac10_ptcl_points_class.txt", help="Output classified point cloud file")
+        p.add_option("-i", "--input", dest="infile", default="/projectnb/echidna/lidar/DWEL_Processing/HF2014/tmp-test-data/HFHD_20140919_C_dual_cube_bsfix_pxc_update_atp2_sdfac2_sievefac10_ptcl_points_small.txt", help="Input dual-wavelength point cloud file")
+        p.add_option("-o", "--output", dest="outfile", default="/projectnb/echidna/lidar/DWEL_Processing/HF2014/tmp-test-data/HFHD_20140919_C_dual_cube_bsfix_pxc_update_atp2_sdfac2_sievefac10_ptcl_points_small_class.txt", help="Output classified point cloud file")
 
-        p.add_option("-i", "--input", dest="infile", default=None, help="Input dual-wavelength point cloud file")
-        p.add_option("-o", "--output", dest="outfile", default=None, help="Output classified point cloud file")
+        # p.add_option("-i", "--input", dest="infile", default=None, help="Input dual-wavelength point cloud file")
+        # p.add_option("-o", "--output", dest="outfile", default=None, help="Output classified point cloud file")
 
 
         p.add_option("-x", "--index", dest="index", default="NDI", help="Name of spectral index for thresholding, NDI, SR")
