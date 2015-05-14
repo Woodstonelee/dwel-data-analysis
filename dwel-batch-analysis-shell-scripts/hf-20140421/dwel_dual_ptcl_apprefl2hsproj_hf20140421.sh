@@ -47,5 +47,4 @@ PIXELCOL=( \
 )
 
 PYCMD="/usr3/graduate/zhanli86/Programs/dwel-data-analysis/dwel-data-utils/dwel_points2hsproj.py"
-
 python $PYCMD -i ${DUALPTSFILES[$SGE_TASK_ID-1]} -o ${HSPRJFILES[$SGE_TASK_ID-1]} -p ${PIXELCOL[$SGE_TASK_ID-1]} --pixelfunc "mean" -M --pulseno=6 --intensity=${PIXELCOL[$SGE_TASK_ID-1]} -H 1.5 --maxzen=117

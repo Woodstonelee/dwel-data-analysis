@@ -58,28 +58,21 @@ def main(cmdargs):
     """
 
     # set some parameters
-    cind = {'azimuth':10}
     headerlines = 3
 
     # read inputs from command line
     infile = cmdargs.infile
     outfile = cmdargs.outfile
-
-    optdict = cmdargs.__dict__
-    if 'minaz' in optdict:
-        minaz = float(optdict['minaz'])
-    else:
-        minaz = 0.0
-    if 'maxaz' in optdict:
-        maxaz = float(optdict['maxaz'])
-    else:
-        maxaz = 360.0
+    minaz = cmdargs.minaz
+    maxaz = cmdargs.maxaz
+    azind = cmdargs.azx-1
 
     # set up bounding box
     boundbox = {'azimuth':[minaz, maxaz]}
+    cind={'azimuth':azind}
 
     # read points from text file
-    points = np.loadtxt(infile, delimiter=',', skiprows=headerlines)
+    points = np.loadtxt(infile, delimiter=',', skiprows=headerlines, comments=None)
     rowflag = slice_points(points, boundbox, cind)
 
     # get the original header lines to the slice point cloud file.
@@ -95,18 +88,19 @@ def main(cmdargs):
 class CmdArgs:
     def __init__(self):
         p = optparse.OptionParser()
-        p.add_option("-i", "--input", dest="infile", default="/projectnb/echidna/lidar/DWEL_Processing/HF2014/tmp-test-data/HFHD_20140919_C_1548_cube_bsfix_pxc_update_atp2_sdfac2_sievefac10_ptcl_points.txt", help="Input csv file of DWEL point cloud data")
-        p.add_option("-o", "--output", dest="outfile", default="/projectnb/echidna/lidar/DWEL_Processing/HF2014/tmp-test-data/HFHD_20140919_C_1548_cube_bsfix_pxc_update_atp2_sdfac2_sievefac10_ptcl_points_small.txt", help=("Output csv file of sliced DWEL point cloud"))
-        p.add_option("--minaz", dest="minaz", default="0.0", help="Minimum azimuth, unit, deg. [default: 0.0]")
-        p.add_option("--maxaz", dest="maxaz", default="360.0", help="Maximum azimuth, unit, deg. [default: 360.0]")
+        p.add_option("-i", "--input", dest="infile", default="/projectnb/echidna/lidar/DWEL_Processing/HF2014/tmp-test-data/HFHD_20140919_C_dual_cube_bsfix_pxc_update_atp2_ptcl_points_class_NDI_thresh_0.550.txt", help="Input csv file of DWEL point cloud data")
+        p.add_option("-o", "--output", dest="outfile", default="/projectnb/echidna/lidar/DWEL_Processing/HF2014/tmp-test-data/HFHD_20140919_C_dual_cube_bsfix_pxc_update_atp2_ptcl_points_class_NDI_thresh_0.550_small.txt", help=("Output csv file of sliced DWEL point cloud"))
+        p.add_option("--azx", dest="azx", type="int", default=11, help="Column index of azimuth, with first column being 1. [default: 11")
+        p.add_option("--minaz", dest="minaz", type="float", default=0.0, help="Minimum azimuth, unit, deg. [default: 0.0]")
+        p.add_option("--maxaz", dest="maxaz", type="float", default=360.0, help="Maximum azimuth, unit, deg. [default: 360.0]")
 
         (options, args) = p.parse_args()
         self.__dict__.update(options.__dict__)
 
-        # if (self.infile is None) | (self.outfile is None):
-        #     p.print_help()
-        #     print "Both input and output file names are required."
-        #     sys.exit()
+        if (self.infile is None) | (self.outfile is None):
+            p.print_help()
+            print "Both input and output file names are required."
+            sys.exit()
 
 if __name__ == "__main__":
     cmdargs = CmdArgs()

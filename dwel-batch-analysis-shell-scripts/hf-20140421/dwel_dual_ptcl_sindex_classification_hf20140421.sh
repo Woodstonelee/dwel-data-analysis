@@ -16,11 +16,11 @@ DUALPTSFILES=( \
 )
 
 CLSPTSFILES=( \
-"/projectnb/echidna/lidar/DWEL_Processing/HF2014/Hardwood20140421/HFHD20140421-dual-points-class-by-ndi/HFHD_20140421_C_dual_cube_bsfix_pxc_update_atp2_ptcl_points_class.txt" \
-"/projectnb/echidna/lidar/DWEL_Processing/HF2014/Hardwood20140421/HFHD20140421-dual-points-class-by-ndi/HFHD_20140421_E_dual_cube_bsfix_pxc_update_atp2_ptcl_points_class.txt" \
-"/projectnb/echidna/lidar/DWEL_Processing/HF2014/Hardwood20140421/HFHD20140421-dual-points-class-by-ndi/HFHD_20140421_N_dual_cube_bsfix_pxc_update_atp2_ptcl_points_class.txt" \
-"/projectnb/echidna/lidar/DWEL_Processing/HF2014/Hardwood20140421/HFHD20140421-dual-points-class-by-ndi/HFHD_20140421_S_dual_cube_bsfix_pxc_update_atp2_ptcl_points_class.txt" \
-"/projectnb/echidna/lidar/DWEL_Processing/HF2014/Hardwood20140421/HFHD20140421-dual-points-class-by-ndi/HFHD_20140421_W_dual_cube_bsfix_pxc_update_atp2_ptcl_points_class.txt" \
+"/projectnb/echidna/lidar/DWEL_Processing/HF2014/Hardwood20140421/HFHD20140421-dual-points-class-by-ndi/cal-simul-appndi-visual-thresh/HFHD_20140421_C_dual_cube_bsfix_pxc_update_atp2_ptcl_points_class.txt" \
+"/projectnb/echidna/lidar/DWEL_Processing/HF2014/Hardwood20140421/HFHD20140421-dual-points-class-by-ndi/cal-simul-appndi-visual-thresh/HFHD_20140421_E_dual_cube_bsfix_pxc_update_atp2_ptcl_points_class.txt" \
+"/projectnb/echidna/lidar/DWEL_Processing/HF2014/Hardwood20140421/HFHD20140421-dual-points-class-by-ndi/cal-simul-appndi-visual-thresh/HFHD_20140421_N_dual_cube_bsfix_pxc_update_atp2_ptcl_points_class.txt" \
+"/projectnb/echidna/lidar/DWEL_Processing/HF2014/Hardwood20140421/HFHD20140421-dual-points-class-by-ndi/cal-simul-appndi-visual-thresh/HFHD_20140421_S_dual_cube_bsfix_pxc_update_atp2_ptcl_points_class.txt" \
+"/projectnb/echidna/lidar/DWEL_Processing/HF2014/Hardwood20140421/HFHD20140421-dual-points-class-by-ndi/cal-simul-appndi-visual-thresh/HFHD_20140421_W_dual_cube_bsfix_pxc_update_atp2_ptcl_points_class.txt" \
 )
 
 INDEX=( \
@@ -32,11 +32,11 @@ INDEX=( \
 )
 
 NDITHRESH=( \
--0.154 \
--0.154 \
--0.154 \
--0.154 \
--0.154 \
+0.024 \
+0.063 \
+0.055 \
+0.055 \
+0.076 \
 )
 
 # start Zhan Li's python environment

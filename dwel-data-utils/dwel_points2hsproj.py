@@ -369,6 +369,13 @@ def dwel_points2hsproj(infile, outfile, \
     # set up a 2D numpy array as the hemi-image
     outimage = np.zeros((nrows, ncols))
     outimage.fill(np.nan)
+    # set up a 2D numpy array to store number of pixels selected for output
+    # image and another 2D numpy array to store the number of remaining pixels
+    # not selected.
+    num_inpts = np.zeros((nrows, ncols))
+    num_inpts.fill(np.nan)
+    num_outpts = np.zeros((nrows, ncols))
+    num_outpts.fill(np.nan)
 
     # calculate azimuth angles of all points
     ptsaz = np.arctan2(points[:, xyzcols[0]], points[:, xyzcols[1]])
@@ -420,16 +427,24 @@ def dwel_points2hsproj(infile, outfile, \
                     +"{0:d}".format(p)
         # get points located in this pixel
         tmppoints = points[ptsinind[p:p+ptsoutcounts[p]], :]
+        # pixel location to be assigned in the hemi-image
+        pixel_loc = np.unravel_index(currentoutind, (nrows, ncols))
         # which point/points to be used in hs-imag pixel assingment
         if tmppoints.shape[0] == 1:
             # only one point inside this pixel, no need to call indexfunc to
             # choose points. Assign attribute of this point to the pixel
-            outimage[np.unravel_index(currentoutind, (nrows, ncols))] \
+            outimage[pixel_loc] \
                 = np.asscalar(pixelfunc(np.array([tmppoints[0, pixelcol]])))
+            num_inpts[pixel_loc] = 1
+            num_outpts[pixel_loc] = 0
         else:
             # more than one points in this pixel. call indexfunc to choose
             # points to assign this pixel.
             tmpind = indexfunc(tmppoints[:, indexcol])
+            tmpnum_in = len(tmpind)
+            tmpnum_out = len(tmppoints) - tmpnum_in
+            num_inpts[pixel_loc] = tmpnum_in
+            num_outpts[pixel_loc] = tmpnum_out
             tmppoints = tmppoints[tmpind, :]
             if debug and pulsemax:
                 # test
@@ -437,8 +452,15 @@ def dwel_points2hsproj(infile, outfile, \
                 if np.count_nonzero(tmpucounts>1) > 0:
                     print "Error, maximum of each pulse are not select out properly"
 #            import pdb; pdb.set_trace()
-            outimage[np.unravel_index(currentoutind, (nrows, ncols))] \
+            outimage[pixel_loc] \
                 = np.asscalar(pixelfunc(np.array([tmppoints[:, pixelcol]])))
+            if classflag:
+                # num_inpts then stores the number of points of the assigned
+                # class to the pixel
+                tmpnum_in = np.sum(tmppoints[:, pixelcol] == outimage[pixel_loc])
+                tmpnum_out = len(tmppoints) - tmpnum_in
+                num_inpts[pixel_loc] = tmpnum_in
+                num_outpts[pixel_loc] = tmpnum_out
 
         # go to next hemi-image pixel
         p += ptsoutcounts[p]
@@ -446,6 +468,8 @@ def dwel_points2hsproj(infile, outfile, \
     # before export the image, transpose the array so that it conforms with the
     # view from bottom to up
     outimage = np.transpose(outimage)
+    num_inpts = np.transpose(num_inpts)
+    num_outpts = np.transpose(num_outpts)
     # export image resolution
     dpi = 72
     # get image size
@@ -464,10 +488,11 @@ def dwel_points2hsproj(infile, outfile, \
         mpl.image.imsave(outpngfile+".png", outimage_masked, dpi=dpi, \
                              vmin=np.percentile(outimage[~np.isnan(outimage)], 2), \
                              vmax=np.percentile(outimage[~np.isnan(outimage)], 98), \
-                             cmap=plt.get_cmap("PiYG"))
+                             cmap=plt.get_cmap("RdYlGn"))
 
+        outimagemask = np.isnan(outimage)
         # now write projection image to ENVI classification file
-        outimage[np.isnan(outimage)] = 0
+        outimage[outimagemask] = 0
         outimage.astype(np.uint8)
         outformat = "ENVI"
         driver = gdal.GetDriverByName(outformat)
@@ -507,6 +532,12 @@ def dwel_points2hsproj(infile, outfile, \
             "class lookup = {0,  0,  0, 255,  0,  0,  0, 255,  0}"
         with open(hdrfile, 'w') as hdrf:
             hdrf.write(hdrstr)
+
+        # prepare a file name for writing an extra ENVI file of output image,
+        # mask and number of points in each pixel
+        strlist = outfile.rsplit('.')
+        outfile = ".".join(strlist[0:-1]) + "_extrainfo.img"
+
     else:
         mpl.image.imsave(outpngfile+".png", outimage_masked, dpi=dpi, \
                              vmin=np.percentile(outimage[~np.isnan(outimage)], 2), \
@@ -515,49 +546,61 @@ def dwel_points2hsproj(infile, outfile, \
 
         outimagemask = np.isnan(outimage)
         outimage[outimagemask] = 0
-        # now write projection image to ENVI standard file
-        outimage.astype(np.float32)
-        outformat = "ENVI"
-        driver = gdal.GetDriverByName(outformat)
-        outds = driver.Create(outfile, outimage.shape[1], outimage.shape[0], 2, gdal.GDT_Float32)
-        outds.GetRasterBand(1).WriteArray(outimage)
-        outds.FlushCache()
-        # write a mask band
-        outimagemask = np.logical_not(outimagemask)
-        outimagemask.astype(np.float32)
-        outds.GetRasterBand(2).WriteArray(outimagemask)
-        outds.FlushCache()
-        # close the dataset
-        outds = None
-        # Now write envi header file manually. NOT by gdal...which can't do this
-        # job...  set header file
-        # get header file name
-        strlist = outfile.rsplit('.')
-        hdrfile = ".".join(strlist[0:-1]) + ".hdr"
-        if os.path.isfile(hdrfile):
-            os.remove(hdrfile)
-            print "Old header file removed: " + hdrfile 
-        hdrfile = outfile + ".hdr"
-        hdrstr = \
-            "ENVI\n" + \
-            "description = {\n" + \
-            "Hemispherical projection image of DWEL point cloud, \n" + \
-            infile + ", \n" + \
-            "Create, [" + time.strftime("%c") + "]}\n" + \
-            "samples = " + "{0:d}".format(outimage.shape[1]) + "\n" \
-            "lines = " + "{0:d}".format(outimage.shape[0]) + "\n" \
-            "bands = 2\n" + \
-            "header offset = 0\n" + \
-            "file type = ENVI standard\n" + \
-            "data type = 4\n" + \
-            "interleave = bsq\n" + \
-            "sensor type = Unknown\n" + \
-            "byte order = 0\n" + \
-            "wavelength units = unknown\n" + \
-            "band names = {DWEL points " + os.path.basename(outfile)+ ", mask}"
-        with open(hdrfile, 'w') as hdrf:
-            hdrf.write(hdrstr)
         
+    num_inpts[outimagemask] = 0
+    num_outpts[outimagemask] = 0
+    # now write projection image to ENVI standard file
+    outimage.astype(np.float32)
+    num_inpts.astype(np.float32)
+    num_outpts.astype(np.float32)
+
+    outformat = "ENVI"
+    driver = gdal.GetDriverByName(outformat)
+    nbands = 4
+    outds = driver.Create(outfile, outimage.shape[1], outimage.shape[0], nbands, gdal.GDT_Float32)
+    outds.GetRasterBand(1).WriteArray(outimage)
+    outds.FlushCache()
+    # write a mask band
+    outimagemask = np.logical_not(outimagemask)
+    outimagemask.astype(np.float32)
+    outds.GetRasterBand(2).WriteArray(outimagemask)
+    outds.FlushCache()
+    # write number of points in a pixels selected to generate the assigned
+    # pixel values.
+    outds.GetRasterBand(3).WriteArray(num_inpts)
+    outds.FlushCache()
+    outds.GetRasterBand(4).WriteArray(num_outpts)
+    outds.FlushCache()
+    # close the dataset
+    outds = None
+    # Now write envi header file manually. NOT by gdal...which can't do this
+    # job...  set header file
+    # get header file name
+    strlist = outfile.rsplit('.')
+    hdrfile = ".".join(strlist[0:-1]) + ".hdr"
+    if os.path.isfile(hdrfile):
+        os.remove(hdrfile)
+        print "Old header file removed: " + hdrfile 
+    hdrfile = outfile + ".hdr"
+    hdrstr = \
+        "ENVI\n" + \
+        "description = {\n" + \
+        "Hemispherical projection image of DWEL point cloud, \n" + \
+        infile + ", \n" + \
+        "Create, [" + time.strftime("%c") + "]}\n" + \
+        "samples = {0:d}\n".format(outimage.shape[1]) + \
+        "lines = {0:d}\n".format(outimage.shape[0]) + \
+        "bands = {0:d}\n".format(nbands) + \
+        "header offset = 0\n" + \
+        "file type = ENVI standard\n" + \
+        "data type = 4\n" + \
+        "interleave = bsq\n" + \
+        "sensor type = Unknown\n" + \
+        "byte order = 0\n" + \
+        "wavelength units = unknown\n" + \
+        "band names = {DWEL points " + os.path.basename(outfile)+ ", mask, num_inpts, num_outpts}"
+    with open(hdrfile, 'w') as hdrf:
+        hdrf.write(hdrstr)
 
 #    import pdb; pdb.set_trace()
 
@@ -625,6 +668,7 @@ def main(cmdargs):
     elif pixelfuncname.upper() == "MODE":
         pixelfunc = lambda x: spstats.mode(x, axis=None)[0]
     else:
+        print "Given name of pixel function: " + pixelfuncname
         print "Error, cannot recognize the name of pixel function. Avaialbe, \n" \
             + "direct: directly assign a 'pixel' column value of select " + \
             "point for a projected bin. If more than one points are " + \
@@ -651,11 +695,11 @@ class CmdArgs:
     def __init__(self):
         p = optparse.OptionParser()
 
-        # p.add_option("-i", "--input", dest="infile", default="/projectnb/echidna/lidar/DWEL_Processing/HF2014/tmp-test-data/HFHD_20140919_C_1064_cube_bsfix_pxc_update_atp2_sdfac2_sievefac10_ptcl_points_small.txt", help="Input csv file of DWEL point cloud data")
-        # p.add_option("-o", "--output", dest="outfile", default="/projectnb/echidna/lidar/DWEL_Processing/HF2014/tmp-test-data/HFHD_20140919_C_1064_cube_bsfix_pxc_update_atp2_sdfac2_sievefac10_ptcl_points_small_hsproj.img", help="Output hemispherical projection image")
+        p.add_option("-i", "--input", dest="infile", default="/projectnb/echidna/lidar/DWEL_Processing/HF2014/Hardwood20140503/spectral-points-by-union/HFHD20140503-dual-points-clustering/merging/HFHD_20140503_C_dual_cube_bsfix_pxc_update_atp2_ptcl_points_kmeans_canupo_class.txt", help="Input csv file of DWEL point cloud data")
+        p.add_option("-o", "--output", dest="outfile", default="/projectnb/echidna/lidar/DWEL_Processing/HF2014/Hardwood20140503/spectral-points-by-union/HFHD20140503-dual-points/HFHD_20140503_C_dual_cube_bsfix_pxc_update_atp2_ptcl_points_nir_hsp2.img", help="Output hemispherical projection image")
 
-        p.add_option("-i", "--input", dest="infile", default=None, help="Input csv file of DWEL point cloud data")
-        p.add_option("-o", "--output", dest="outfile", default=None, help="Output hemispherical projection image")
+#        p.add_option("-i", "--input", dest="infile", default=None, help="Input csv file of DWEL point cloud data")
+#        p.add_option("-o", "--output", dest="outfile", default=None, help="Output hemispherical projection image")
 
         p.add_option("-r", "--resolution", dest="outres", default=2.0, type=float, help="Resolution of hemispherical projection. Unit: mrad. Default: 2.0 mrad")
         p.add_option("-H", "--camheight", dest="camheight", default=0.0, type=float, help="Height of hemi-camera relative to zero Z point of input point cloud. Unit: the same with input point cloud coordinates. Default: 0.0")

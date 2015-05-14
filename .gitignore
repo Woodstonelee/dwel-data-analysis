@@ -59,3 +59,6 @@ target/
 *.pe*
 *.po*
 *.png
+
+# .nfsXXXXX files from NFS filesystem
+*.nfs*

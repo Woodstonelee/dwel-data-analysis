@@ -16,7 +16,8 @@ AUTHORS:
 
 import sys
 import os
-import optparse
+import argparse
+import warnings
 
 from osgeo import gdal
 
@@ -24,8 +25,9 @@ import numpy as np
 
 gdal.AllRegister()
 
-def dwel_image_random_sampling(maskfile, outfile, numsamples=100, \
-                                   maskb=1, ancfile=None, ancb=1):
+def dwel_image_random_sampling(maskfile, outfile, classes=None, numsamples=100, \
+                                   maskb=1, ancfile=None, ancb=1, \
+                                   maskcircle=None):
     """
     Generate random samples from a mask image file of DWEL data. Currently only
     support simply random sampling design.
@@ -40,6 +42,9 @@ def dwel_image_random_sampling(maskfile, outfile, numsamples=100, \
 
         ancb (int): band index of anciilary attribute to attach to random
         samples, with first band being 1.
+
+        maskcircle (tuple): 3-element tuple giving (center_x, center_y, radius)
+        of a circle within which random samples are drawn from.
     
     Returns:
 
@@ -61,86 +66,138 @@ def dwel_image_random_sampling(maskfile, outfile, numsamples=100, \
             addatt = True
         ancds = None
 
-    # get the indices of valid samples
-    validind = np.ravel_multi_index(np.nonzero(mask), \
+    maskds = None
+
+    validx, validy = np.nonzero(mask)
+    # if a circle is given to define the area for random samples
+    if maskcircle is not None:
+        tmpflag = (validx - maskcircle[0])**2 + (validy - maskcircle[1])**2 <= maskcircle[2]**2
+        validx = validx[tmpflag]
+        validy = validy[tmpflag]
+
+    # get the indices of valid samples for all classes
+    validind = np.ravel_multi_index((validx, validy), \
                                         (maskband.YSize, maskband.XSize))
-    if len(validind) >= numsamples:
-        randind = np.random.permutation(len(validind))[:numsamples]
+    if classes is None:
+        if len(validind) >= numsamples:
+            randind = np.random.permutation(len(validind))[:numsamples]
+        else:
+            print "Error: number of valid pixels is fewer than requested number of samples"
+            print "No samples are generated. Exit"
+            maskds = None
+            return ()
+        sampleind = validind[randind]
     else:
-        print "Error: number of valid pixels is fewer than requested number of samples"
-        print "No samples are generated. Exit"
-        maskds = None
-        return ()
-    
-    sampleind = validind[randind]
+        numclass = len(classes)
+        if numclass != len(numsamples):
+            maskds = None
+            raise RuntimeError('Number of classes is {0:d} while only {1:d} numbers for sample counts are given!'.format(numclass, len(numsamples)))
+        else:
+            mask_vec = mask.flatten()[validind]
+            sampleind = [ draw_samples(validind[mask_vec==cls], ns) for cls, ns in zip(classes, numsamples) ]
+            sampleind = np.hstack(sampleind)
+
+
     if addatt:
         ancatt = np.ravel(ancatt, order='C')
-        sampleatt = ancatt[randind]
+        sampleatt = ancatt[sampleind]
     samplepos = np.unravel_index(sampleind, (maskband.YSize, maskband.XSize), order='C')
+
+    # convert pixel location to default coordinates for a raster in QGIS.
+    ypos = samplepos[0].astype(float)*(-1) - 0.5
+    xpos = samplepos[1].astype(float) + 0.5
 
     # write sampels to output file and attribute if they are supplied
     headerstr = \
         "Random samples from " + maskfile + "\n" + \
         "Band of mask = {0:d}\n".format(maskb) + \
-        "Number of samples = {0:d}\n".format(numsamples)
+        "Class code = "
+    for cls in classes:
+        headerstr += "{0:d}, ".format(cls)
+    headerstr = headerstr.rstrip(', ') + "\nNumber of samples = "
+    for ns in numsamples:
+        headerstr += "{0:d}, ".format(ns)
+    headerstr = headerstr.rstrip(', ') + "\n"
+
+    numsamples = len(sampleind)
     if addatt:
-        outmat = np.hstack(( samplepos[1].reshape(numsamples, 1), \
-                                 samplepos[0].reshape(numsamples, 1), \
+        outmat = np.hstack(( xpos.reshape(numsamples, 1), \
+                                 ypos.reshape(numsamples, 1), \
                                  sampleatt.reshape(numsamples, 1) ))
         headerstr = headerstr + \
             "Attributes from " + ancfile + "\n" + \
             "Band of attribute = {0:d}\n".format(ancb) + \
             "X, Y, Attribute"
-        fmtstr = ['%d', '%d', '%.3f']
+        fmtstr = ['%.3f', '%.3f', '%.3f']
     else:
-        outmat = np.hstack(( samplepos[1].reshape(numsamples, 1), \
-                                 samplepos[0].reshape(numsamples, 1) ))
+        outmat = np.hstack(( xpos.reshape(numsamples, 1), \
+                                 ypos.reshape(numsamples, 1) ))
         headerstr = headerstr + \
             "Attributes None\n" + \
             "Band of attribute = None\n" + \
             "X, Y"
-        fmtstr = ['%d', '%d']
+        fmtstr = ['%.3f', '%.3f']
 
-    np.savetxt(outfile, outmat, fmt=fmtstr, delimiter=',', header=headerstr)
+    np.savetxt(outfile, outmat, fmt=fmtstr, delimiter=',', header=headerstr, comments="")
 
-    maskds = None
+
+def draw_samples(pop_vec, num_samp):
+    """
+    Draw num_sample samples from a vector pop_vec. If number of elements in
+    pop_vec is fewer than num_samp, raise an warning and use all elements in the
+    pop_vec.
+    """
+    if len(pop_vec) < num_samp:
+        warnings.warn("Number of samples {0:d} requested are larger than number of available samples {1:d}. \nAll available samples are used.".format(num_samp, len(pop_vec)), RuntimeWarning)
+        return pop_vec
+    else:
+        randind = np.random.permutation(len(pop_vec))[:num_samp]
+        return pop_vec[randind]
 
 def main(cmdargs):
     maskfile = cmdargs.maskfile
     outfile = cmdargs.outfile
+    classes = cmdargs.classes
     numsamples = cmdargs.numsamples
     maskb = cmdargs.maskb
     ancfile = cmdargs.ancfile
     ancb = cmdargs.ancb
+
+    if cmdargs.center is None or cmdargs.radius is None:
+        maskcircle = None
+    else:
+        maskcircle = (cmdargs.center[0], cmdargs.center[1], cmdargs.radius)
+    dwel_image_random_sampling(maskfile, outfile, classes=classes, numsamples=numsamples, \
+                                   maskb=maskb, ancfile=ancfile, ancb=ancb, \
+                                   maskcircle=maskcircle)
+
+def getCmdArgs():
+    p = argparse.ArgumentParser(description="Generate random samples from a mask file")
+
+    p.add_argument("-m", "--mask", dest="maskfile", default="/projectnb/echidna/lidar/DWEL_Processing/HF2014/Hardwood20140503/spectral-points-by-union/HFHD20140503-dual-points-clustering/merging/HFHD_20140503_C_dual_cube_bsfix_pxc_update_atp2_ptcl_points_kmeans_canupo_class_hsp2.img", help="Input projection file where a mask is read, *.img associated with *.hdr")
+    p.add_argument("-o", "--output", dest="outfile", default="/projectnb/echidna/lidar/DWEL_Processing/HF2014/Hardwood20140503/hfhd20140503-points-classification-accuracy-assessment/hsproj-random-samples/HFHD_20140503_C_dual_cube_bsfix_pxc_update_atp2_ptcl_points_hsp2_random_samples.txt", help="Output csv file of random samples")
+    p.add_argument("-a", "--ancfile", dest="ancfile", default="/projectnb/echidna/lidar/DWEL_Processing/HF2014/Hardwood20140503/spectral-points-by-union/HFHD20140503-dual-points-clustering/merging/HFHD_20140503_C_dual_cube_bsfix_pxc_update_atp2_ptcl_points_kmeans_canupo_class_hsp2.img", help="Input DWEL projection image of ancillary attributes to be added to random samples, *.img associated with *.hdr. If not given, no attributes will be added to random samples")
     
-    dwel_image_random_sampling(maskfile, outfile, numsamples=numsamples, \
-                                   maskb=maskb, ancfile=ancfile, ancb=ancb)
+    # p.add_argument("-m", "--mask", dest="maskfile", default=None, help="Input projection file where a mask is read, *.img associated with *.hdr")
+    # p.add_argument("-o", "--output", dest="outfile", default=None, help="Output csv file of random samples")
+    # p.add_argument("-a", "--ancfile", dest="ancfile", default=None, help="Input DWEL projection image of ancillary attributes to be added to random samples, *.img associated with *.hdr. If not given, no attributes will be added to random samples")
 
-class CmdArgs:
-    def __init__(self):
-        p = optparse.OptionParser()
+    p.add_argument("--maskband", dest="maskb", default=1, type=int, help="Band index of mask in the mask file, with first band being 1. Default: 1")
+    p.add_argument("-c", "--classes", dest="classes", type=int, nargs='+', default=None, help="Class codes for which random samples are generated. If none, use simple random sampling for all classess together and '--numsamples' should give one value. Otherwise, use stratified random sampling and number of class codes must be the same for the number of values for number of samples. Default: none")
+    p.add_argument("-n", "--numsamples", dest="numsamples", type=int, nargs='+', default=(100), help="Number of random samples to be drawn for each class by a stratified random sampling. If only one value is given, simple random sampling for all classes together. Default: 100")
+    p.add_argument("--ancband", dest="ancb", default=1, type=int, help="Band index of a layer in the ancillary image where random samples' attribute will be assigned from, with first band being 1. Default: 1")
 
-        # p.add_option("-m", "--mask", dest="maskfile", default="/projectnb/echidna/lidar/DWEL_Processing/HF2014/Hardwood20140919/HFHD_20140919_dual_points/HFHD_20140919_C_dual_cube_bsfix_pxc_update_atp2_sdfac2_sievefac10_ptcl_points_nir_hsp2.img", help="Input projection file where a mask is read, *.img associated with *.hdr")
-        # p.add_option("-o", "--output", dest="outfile", default="/projectnb/echidna/lidar/DWEL_Processing/HF2014/tmp-test-data/test_hfhd20140919_c_dual_random_samples.txt", help="Output csv file of random samples")
-        # p.add_option("-a", "--ancfile", dest="ancfile", default="/projectnb/echidna/lidar/DWEL_Processing/HF2014/Hardwood20140919/HFHD_20140919_dual_points_class_by_ndi/HFHD_20140919_C_dual_cube_bsfix_pxc_update_atp2_sdfac2_sievefac10_ptcl_points_class_NDI_thresh_0.503.txt", help="Input DWEL projection image of ancillary attributes to be added to random samples, *.img associated with *.hdr. If not given, no attributes will be added to random samples")
+    p.add_argument("--center", dest='center', type=int, nargs=2, metavar=('center_x', 'center_y'), default=None, help='Location of the center of a circle within which random samples are drawn from')
+    p.add_argument("-r", "--radius", dest='radius', type=int, default=None, help='Radius of a circle within which random samples are drawn from')
 
-        
-        p.add_option("-m", "--mask", dest="maskfile", default=None, help="Input projection file where a mask is read, *.img associated with *.hdr")
-        p.add_option("-o", "--output", dest="outfile", default=None, help="Output csv file of random samples")
-        p.add_option("-a", "--ancfile", dest="ancfile", default=None, help="Input DWEL projection image of ancillary attributes to be added to random samples, *.img associated with *.hdr. If not given, no attributes will be added to random samples")
+    cmdargs = p.parse_args()
+    if (cmdargs.maskfile is None) | (cmdargs.outfile is None):
+        p.print_help()
+        print "Both mask and output file names are required."
+        sys.exit()
 
-        p.add_option("--maskband", dest="maskb", default=1, type=int, help="Band index of mask in the mask file, with first band being 1. Default: 1")
-        p.add_option("-n", "--numsamples", dest="numsamples", default=100, type=int, help="Number of random samples to be drawn. Default: 100")
-        p.add_option("--ancband", dest="ancb", default=1, type=int, help="Band index of a layer in the ancillary image where random samples' attribute will be assigned from, with first band being 1. Default: 1")
-
-        (options, args) = p.parse_args()
-        self.__dict__.update(options.__dict__)
-
-        if (self.maskfile is None) | (self.outfile is None):
-            p.print_help()
-            print "Both mask and output file names are required."
-            sys.exit()
+    return cmdargs
 
 if __name__ == "__main__":
-    cmdargs = CmdArgs()
+    cmdargs = getCmdArgs()
     main(cmdargs)
