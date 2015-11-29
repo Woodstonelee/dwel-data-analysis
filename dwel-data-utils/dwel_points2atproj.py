@@ -337,7 +337,7 @@ def dwel_points2atproj(infile, outfile, \
         mpl.image.imsave(outpngfile+".png", outimage_masked, dpi=dpi, \
                              vmin=np.percentile(outimage[~np.isnan(outimage)], 2), \
                              vmax=np.percentile(outimage[~np.isnan(outimage)], 98), \
-                             cmap=plt.get_cmap("jet"))
+                             cmap=plt.get_cmap("gray"))
 
         outimagemask = np.isnan(outimage)
         outimage[outimagemask] = 0

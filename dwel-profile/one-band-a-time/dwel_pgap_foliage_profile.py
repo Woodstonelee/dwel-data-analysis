@@ -43,9 +43,9 @@ def getCmdArgs():
     # p.add_argument("-s","--swirfile", dest="swirfile", default="/projectnb/echidna/lidar/DWEL_Processing/HF2014/tmp-test-data/HFHD_20140919_C_dual_cube_bsfix_pxc_update_atp2_ptcl_points_class_NDI_thresh_0.550_small_swir.spd", help=("Input SPD file of SWIR scan"))
     # p.add_argument("-o","--outprefix", dest="outprefix", default="/projectnb/echidna/lidar/DWEL_Processing/HF2014/tmp-test-data/dwelprofiletest/hfhd_20140919_c_dual", help=("Prefix including a full path to a directory for writing multiple output files"))
 
-    p.add_argument("-n","--nirfile", dest="nirfile", default="/projectnb/echidna/lidar/DWEL_Processing/HF2014/Hardwood20140608/spectral-points-by-union/HFHD_20140608_dual_points-clustering/merging/HFHD_20140608_C_dual_cube_bsfix_pxc_update_atp2_ptcl_points_kmeans_canupo_class_nir.spd", help=("Input SPD file of NIR scan"))
-    p.add_argument("-s","--swirfile", dest="swirfile", default="/projectnb/echidna/lidar/DWEL_Processing/HF2014/Hardwood20140608/spectral-points-by-union/HFHD_20140608_dual_points-clustering/merging/HFHD_20140608_C_dual_cube_bsfix_pxc_update_atp2_ptcl_points_kmeans_canupo_class_swir.spd", help=("Input SPD file of SWIR scan"))
-    p.add_argument("-o","--outprefix", dest="outprefix", default="/projectnb/echidna/lidar/DWEL_Processing/HF2014/Hardwood20140608/spectral-points-by-union/HFHD_20140608_dual_points-clustering-profiles/pgap-by-normalization/maxzen-30/hfhd_20140608_c_dual", help=("Prefix including a full path to a directory for writing multiple output files, WITHOUT underscore in the end"))
+    p.add_argument("-n","--nirfile", dest="nirfile", default="/projectnb/echidna/lidar/DWEL_Processing/HF2014/Hardwood20140503/spectral-points-by-union/HFHD20140503-dual-points-clustering/merging/HFHD_20140503_C_dual_cube_bsfix_pxc_update_atp2_ptcl_points_kmeans_canupo_class_nohitfixed_nir.spd", help=("Input SPD file of NIR scan"))
+    p.add_argument("-s","--swirfile", dest="swirfile", default="/projectnb/echidna/lidar/DWEL_Processing/HF2014/Hardwood20140503/spectral-points-by-union/HFHD20140503-dual-points-clustering/merging/HFHD_20140503_C_dual_cube_bsfix_pxc_update_atp2_ptcl_points_kmeans_canupo_class_nohitfixed_swir.spd", help=("Input SPD file of SWIR scan"))
+    p.add_argument("-o","--outprefix", dest="outprefix", default="/projectnb/echidna/lidar/DWEL_Processing/HF2014/Hardwood20140503/spectral-points-by-union/HFHD20140503-dual-points-clustering-profiles/pgap-by-scaling/hfhd_20140503_c_dual", help=("Prefix including a full path to a directory for writing multiple output files, WITHOUT underscore in the end"))
     # p.add_argument("-n","--nirfile", dest="nirfile", default=None, help=("Input SPD file of NIR scan"))
     # p.add_argument("-s","--swirfile", dest="swirfile", default=None, help=("Input SPD file of SWIR scan"))
     
@@ -78,6 +78,8 @@ def getCmdArgs():
     p.add_argument("--usetemp", dest="usetemp", default=False, action="store_true", help=("Read and use intermediate variables from a saved numpy data file (npz) for next time faster processing. File names are automatically generated according to --outprefix option. Default False."))
     p.add_argument("-g","--debug", dest="debug", default=False, action="store_true", help=("Plot linear fitting plots of PAI estimation for debugging data processing. A lot of plots to save and may take a while. Default False."))
 
+    p.add_argument("--pgap2dmaxrg", dest="pgap2dmaxrg", type=float, default=None, help="Maximum range up to which the Pgap 2D Zenith-Azimuth view is saved. Default: None and will use the range limit of the input data.")
+    
     p.add_argument('-v', '--verbose', dest='verbose', action='store_true', default=False, help='Turn on verbosity')
     
     cmdargs = p.parse_args()
@@ -196,6 +198,7 @@ def main(cmdargs):
                                                     rgres=0.075, \
                                                     savevar=cmdargs.savetemp, \
                                                     tempprefix=cmdargs.outprefix, \
+                                                    pgap2dmaxrg=cmdargs.pgap2dmaxrg, \
                                                     verbose=cmdargs.verbose)
     swirprofileobj = spddwelprofile.DWELClassProfile(cmdargs.swirfile, 'SWIR', \
                                                     zenithbinsize=cmdargs.binsize, \
@@ -208,6 +211,7 @@ def main(cmdargs):
                                                     rgres=0.075, \
                                                     savevar=cmdargs.savetemp, \
                                                     tempprefix=cmdargs.outprefix, \
+                                                    pgap2dmaxrg=cmdargs.pgap2dmaxrg, \
                                                     verbose=cmdargs.verbose)
 
     if cmdargs.usetemp:
@@ -240,13 +244,13 @@ def main(cmdargs):
     nirpgapprofiles = nirprofileobj.getPgapProfileClass(nirPgapZenRgView, nirsensorheight)
     swirpgapprofiles = swirprofileobj.getPgapProfileClass(swirPgapZenRgView, swirsensorheight)
 
-    print "Testing height profile of wood to leaf ratio at different zenith angles ..."
-    nirwood2leaf, zeniths, heights = nirprofileobj.getWoodToLeafProfile(nirpgapprofiles)
-    nirprofileobj.plotWoodToLeafProfile(nirwood2leaf, zeniths, heights, \
-                                            outfile=cmdargs.outprefix+"_wood2leaf_profile_nir.png")
-    swirwood2leaf, zeniths, heights = swirprofileobj.getWoodToLeafProfile(swirpgapprofiles)
-    swirprofileobj.plotWoodToLeafProfile(swirwood2leaf, zeniths, heights, \
-                                             outfile=cmdargs.outprefix+"_wood2leaf_profile_swir.png")
+    # print "Testing height profile of wood to leaf ratio at different zenith angles ..."
+    # nirwood2leaf, zeniths, heights = nirprofileobj.getWoodToLeafProfile(nirpgapprofiles)
+    # nirprofileobj.plotWoodToLeafProfile(nirwood2leaf, zeniths, heights, \
+    #                                         outfile=cmdargs.outprefix+"_wood2leaf_profile_nir.png")
+    # swirwood2leaf, zeniths, heights = swirprofileobj.getWoodToLeafProfile(swirpgapprofiles)
+    # swirprofileobj.plotWoodToLeafProfile(swirwood2leaf, zeniths, heights, \
+    #                                          outfile=cmdargs.outprefix+"_wood2leaf_profile_swir.png")
     
     print "Calculating plant profile for leaves and woodies with linear fitting by Jupp et. al. 2009 ..."
     nirplantprofiles = nirprofileobj.getLinearPlantProfileClass(nirpgapprofiles, plot=cmdargs.debug)

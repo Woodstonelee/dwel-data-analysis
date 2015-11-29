@@ -36,7 +36,25 @@ def getCmdArgs():
 
     return cmdargs
 
-def main(cmdargs):
+def resample_unknown_class(cmdargs):
+    infile = cmdargs.infile
+    outfile = cmdargs.outfile
+    classcode = cmdargs.classcode
+    useraccuracy = cmdargs.useraccuracy
+
+    # get meta data for reading ascii point cloud file
+    with open(infile, 'r') as infobj:
+        for i, line in enumerate(infobj):
+            if i==2:
+                headerstr_list = line.strip('\r\n ').split(',')
+                cind = { hstr.strip():i for i, hstr in enumerate(headerstr_list) }
+                break
+
+    class_label = np.loadtxt(infile, comments=None, delimiter=',', skiprows=3, usecols=[cind['class']])
+    class_label = class_label.astype(np.int)
+    classcode = np.array(classcode).astype(np.int)
+
+def resample_known_class(cmdargs):
     infile = cmdargs.infile
     outfile = cmdargs.outfile
     classcode = cmdargs.classcode
@@ -73,6 +91,9 @@ def main(cmdargs):
                 linestr_list[cind['class']] = "{0:d}".format(class_label[i-3])
                 newline = ",".join(linestr_list) + "\n"
                 outfobj.write(newline)
+
+def main(cmdargs):
+    resample_known_class(cmdargs)
 
 if __name__=="__main__":
     cmdargs = getCmdArgs()

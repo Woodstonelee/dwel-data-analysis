@@ -32,7 +32,9 @@ class DWELClassProfile:
                      minzenith=5.0, maxzenith=70.0, \
                      minazimuth=0.0, maxazimuth=360, \
                      maxht=34.0, htbinsize=0.5, \
-                     rgres=0.075, savevar=False, tempprefix=None, \
+                     rglimit=100.0, rgres=0.075, \
+                     savevar=False, tempprefix=None, \
+                     pgap2dmaxrg=None, \
                      verbose=False):
         
         self.inspdfile = inspdfile
@@ -48,9 +50,10 @@ class DWELClassProfile:
         self.htbinsize = htbinsize
 
         self.rgres = rgres
-        self.rglimit = 100.0 # range limit, 100 m
+        self.rglimit = rglimit # range limit, default 100 m
         self.waveformsynrange = np.arange(0.0, 100.0, rgres)
-        self.nrgbins = len(np.arange(0.0, 100.0, rgres))
+        nrgbins = len(np.arange(0.0, 100.0, rgres))
+        self.nrgbins = nrgbins
 
         # If we save intermediate variables to a numpy data file for faster
         # future processing.
@@ -99,6 +102,15 @@ class DWELClassProfile:
         #         'max_Ia':np.array([[0.95, 0.95], [0.95, 0.95]]), \
         #         'fwhm':np.array([0.54665703, 0.54665703]), \
         #         'sensorheight':0.0}
+
+        # the maximum range for saving Pgap 2D view Zenith-Azimuth. Good for
+        # checking out Pgap up to a certain range.
+        self.pgap2dmaxrg = pgap2dmaxrg
+        if pgap2dmaxrg is None:
+            self.pgap2dmaxrgbin = None
+        else:
+            tmp = np.int(np.fix(pgap2dmaxrg / rgres))
+            self.pgap2dmaxrgbin = tmp if tmp<nrgbins else nrgbins-1
 
     def getSolidAnglePlantProfileClass(self, PgapProfileClass, PAI=None):
         """
@@ -580,7 +592,10 @@ class DWELClassProfile:
                         waveform2d = self.genWaveform2DFromPointsList(pointslist, ngmodel, splitind, classlabel=labelclass[name])
                         pgap2d[validind, :] = self.calcWaveformPgap(waveform2d, fwhm, \
                                                                         rhoclass[name], Ialimclass[name])
-                        self.PgapZenAzView[name][row, :] = pgap2d[:, -1]
+                        if self.pgap2dmaxrgbin is None:
+                            self.PgapZenAzView[name][row, :] = pgap2d[:, -1]
+                        else:
+                            self.PgapZenAzView[name][row, :] = pgap2d[:, self.pgap2dmaxrgbin]
                         pgapavgaz = np.mean(pgap2d[validind, :], axis=0)
                         # pgapavgaz = self.calcWaveformPgapAvgAz(waveform2d, fwhm, rhoclass[name], Ialimclass[name])
                         self.PgapZenRgView[name][row, :] = pgapavgaz
@@ -604,7 +619,11 @@ class DWELClassProfile:
         sys.stdout.flush()
 
         if self.savevar:
-            np.savez((self.tempprefix + "_"+self.bandlabel.lower()+"_Pgap2DView.npz"), \
+            if self.pgap2dmaxrg is None:
+                outnpzfile = self.tempprefix + "_"+self.bandlabel.lower()+"_Pgap2DView.npz"
+            else:
+                outnpzfile = self.tempprefix + "_"+self.bandlabel.lower()+"_Pgap2DView_MaxRg{0:.2f}.npz".format(self.pgap2dmaxrg)
+            np.savez(outnpzfile, \
                          PgapZenAzView=self.PgapZenAzView, \
                          PgapZenRgView=self.PgapZenRgView, \
                          sensorheight=self.sensorheight)

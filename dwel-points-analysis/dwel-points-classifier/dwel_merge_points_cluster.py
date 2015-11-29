@@ -13,7 +13,7 @@ def getCmdArgs():
     p.add_argument('-i', '--inprefix', dest='inprefix', default='/projectnb/echidna/lidar/DWEL_Processing/HF2014/Hardwood20140503/spectral-points-by-union/HFHD20140503-dual-points-clustering/HFHD_20140503_C_dual_cube_bsfix_pxc_update_atp2_ptcl_points_kmeans_', help='Prefix of input point cluster files. Be sure to include full path in the prefix string, with underscore in the end')
     p.add_argument('--ndigits', dest='ndigits', type=int, default=2, help='Number of digits of cluster number in the file names of clusters')
     p.add_argument('--csv', dest='csv', default='/projectnb/echidna/lidar/DWEL_Processing/HF2014/Hardwood20140503/spectral-points-by-union/HFHD20140503-dual-points-clustering/merging/HFHD_20140503_C_dual_cube_bsfix_pxc_update_atp2_ptcl_points_kmeans_merging.csv', help='CSV file giving the class assignment to clusters')
-    p.add_argument('-o', '--outprefix', dest='outprefix', default='/projectnb/echidna/lidar/DWEL_Processing/HF2014/Hardwood20140503/spectral-points-by-union/HFHD20140503-dual-points-clustering/merging/HFHD_20140503_C_dual_cube_bsfix_pxc_update_atp2_ptcl_points_kmeans_class_', help='Prefix of output merged point cloud of classes, with underscore in the end')
+    p.add_argument('-o', '--outprefix', dest='outprefix', default='/projectnb/echidna/lidar/DWEL_Processing/HF2014/Hardwood20140503/spectral-points-by-union/HFHD20140503-dual-points-clustering/merging/HFHD_20140503_C_dual_cube_bsfix_pxc_update_atp2_ptcl_points_kmeans_class_test_', help='Prefix of output merged point cloud of classes, with underscore in the end')
 
     p.add_argument('-t', '--thresh', dest='thresh', type=float, default=None, help="Clean point cloud by removing points with apparent reflectance at both wavelengths less than this threshold")
 
@@ -37,7 +37,9 @@ def mergeClusters(inprefix, clscsv, outprefix, ndigits=2, thresh=None, verbose=F
         thresh = thresh*1e3 # conver to unit of 1e3
     cind = {'x':0, 'y':1, 'z':2, \
                 'd_i_nir':3, 'd_i_swir':4, \
-                'number_of_returns':6}
+                'number_of_returns':6, 'sample':11, 'line':12, \
+                'shot_number':7, 'theta':9, 'phi':10, \
+                'ndi':19, 'clabel':20}
 
     class_names = {2:'leaf', 1:'wood', 0:'mix', -1:'gap', -2:'unsure'}
     cluster2class = np.loadtxt(clscsv, dtype=np.int, skiprows=2, usecols=(0, 1), delimiter=',', comments=None)
@@ -75,6 +77,8 @@ def mergeClusters(inprefix, clscsv, outprefix, ndigits=2, thresh=None, verbose=F
             sys.stdout.write("Merging cluster file {0:d} / {1:d}      \r".format(n+1, nclusters))
             sys.stdout.flush()
         with open(inprefix+innamefmtstr.format(cl), 'r') as infobj:
+            sampleind = 0
+            lineind = 0
             for i, line in enumerate(infobj):
                 if i>2:
                     if thresh is None:
@@ -82,6 +86,11 @@ def mergeClusters(inprefix, clscsv, outprefix, ndigits=2, thresh=None, verbose=F
                         outfobjs[cluster2class[n, 1]].write(outline)
                     else:
                         linetokens = line.rstrip('\r\n').split(',')
+                        if (int(linetokens[cind['sample']]) != sampleind) or (int(linetokens[cind['line']]) != lineind):
+                            sampleind = int(linetokens[cind['sample']])
+                            lineind = int(linetokens[cind['line']])
+                            remain_nhits = int(linetokens[cind['number_of_returns']])
+
                         if (int(linetokens[cind['number_of_returns']]) == 0):
                             outline = line.rstrip('\n')+",{0:d}\n".format(cluster2class[n, 1])
                             outfobjs[cluster2class[n, 1]].write(outline)
@@ -91,6 +100,23 @@ def mergeClusters(inprefix, clscsv, outprefix, ndigits=2, thresh=None, verbose=F
                                 outline = line.rstrip('\n')+",{0:d}\n".format(cluster2class[n, 1])
                                 outfobjs[cluster2class[n, 1]].write(outline)
                             else:
+                                # if this point is a single return from a pulse,
+                                # when we remove this point, we add a no-hit
+                                # point record (gap class, -1) to the point
+                                # cloud for no-hit pulse for Pgap calculation
+                                # later.
+                                remain_nhits -= 1
+                                if (remain_nhits==0):
+                                    newlinetokens = ['0' for n in range(len(linetokens))]
+                                    newlinetokens[cind['shot_number']] = linetokens[cind['shot_number']]
+                                    newlinetokens[cind['theta']] = linetokens[cind['theta']]
+                                    newlinetokens[cind['phi']] = linetokens[cind['phi']]
+                                    newlinetokens[cind['sample']] = linetokens[cind['sample']]
+                                    newlinetokens[cind['line']] = linetokens[cind['line']]
+                                    newlinetokens[cind['ndi']] = linetokens[cind['ndi']]
+                                    newlinetokens[cind['clabel']] = linetokens[cind['clabel']]
+                                    outline = ",".join(newlinetokens)+",{0:d}\n".format(-1)
+                                    outfobjs[-1].write(outline)
                                 if verbose:
                                     outline = line.rstrip('\n')+",{0:d}\n".format(cluster2class[n, 1])
                                     outnoisefobj.write(outline)

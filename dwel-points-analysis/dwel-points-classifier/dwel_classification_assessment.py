@@ -142,6 +142,20 @@ def main(cmdargs):
     with open(outfile, 'w') as outfobj:
         outfobj.write("Report on Classification Accuracy Assessment of DWEL point cloud\n")
         outfobj.write("Run made at: "+time.strftime("%c")+"\n")
+        if imgfiles is not None:
+            outfobj.write("\n")
+            outfobj.write("# Number of pixels in mapped classes\n")
+            outfobj.write(",".join([ "{0:d}".format(n) for n in range(len(total_npixel)) ]))
+            outfobj.write("\n")
+            outfobj.write(",".join([ "{0:d}".format(int(n)) for n in total_npixel ]))
+            outfobj.write("\n")
+            outfobj.write("\n")
+            outfobj.write("# Number of points in mapped classes\n")
+            outfobj.write(",".join([ "{0:d}".format(n) for n in range(len(total_npts)) ]))
+            outfobj.write("\n")
+            outfobj.write(",".join([ "{0:d}".format(int(n)) for n in total_npts ]))
+            outfobj.write("\n")
+            
         outfobj.write("\n")
         outfobj.write("# Primary ground truth labels\n")
         outfobj.write("=============================\n")
