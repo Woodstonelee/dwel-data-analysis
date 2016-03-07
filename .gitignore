@@ -64,4 +64,7 @@ target/
 *.nfs*
 
 # IPython notebook checkpoints
-*/.ipynb_checkpoints/*
+**/.ipynb_checkpoints
+
+# shell scripts for batch processing
+**/dwel-batch-analysis-shell-scripts
