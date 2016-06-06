@@ -69,6 +69,8 @@ py_MSCFile::py_MSCFile(const char* name)
   }
   // we do not care for number of neighbors and average dist between nearest neighbors
   for (int i=0; i<nscales; ++i) read(fooi);
+  // now read the line number
+  read(linenum);
 
   bp::list py_param, py_data1, py_data2;
   for(std::size_t i=0; i<param.size(); i++)
@@ -130,6 +132,8 @@ bp::tuple py_MSCFile::py_read_point(size_t pt_idx=std::numeric_limits<size_t>::m
   }
   // we do not care for number of neighbors and average dist between nearest neighbors
   for (int i=0; i<nscales; ++i) read(fooi);
+  // now read the line number
+  read(linenum);
 
   bp::list py_param, py_data1, py_data2;
   for(std::size_t i=0; i<param.size(); i++)
@@ -143,7 +147,7 @@ bp::tuple py_MSCFile::py_read_point(size_t pt_idx=std::numeric_limits<size_t>::m
   }
 
   this->next_pt_idx = pt_idx + 1;
-  return bp::make_tuple(py_param, py_data1, py_data2);
+  return bp::make_tuple(py_param, py_data1, py_data2, linenum);
 }
 
 int py_MSCFile::read_header(std::vector<FloatType>& scales, int& ptnparams)

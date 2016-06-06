@@ -34,6 +34,7 @@ private:
   int fooi;
   size_t data_start_pos;
   size_t point_data_len;
+  size_t linenum;
 
 public:
   py_MSCFile(const char* name);
