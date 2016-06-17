@@ -66,12 +66,12 @@ class DWELSpectralPoints:
         # read points from text file
         print "Loading points"
         nirpoints = np.genfromtxt(nirfile, dtype=np.float32, usecols=self.ind, \
-                                      delimiter=',', skiprows=self.headerlines, \
+                                      delimiter=',', skip_header=self.headerlines, \
                                       filling_values=np.nan, usemask=False, \
                                       comments=None)
 
         swirpoints = np.genfromtxt(swirfile, dtype=np.float32, usecols=self.ind, \
-                                      delimiter=',', skiprows=self.headerlines, \
+                                      delimiter=',', skip_header=self.headerlines, \
                                       filling_values=np.nan, usemask=False, \
                                        comments=None)
 
