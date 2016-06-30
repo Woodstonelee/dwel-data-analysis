@@ -32,14 +32,25 @@ class DWELSpectralPoints:
         # set some parameters
         self.i_scale = 1000.0
         self.headerlines = 3
-        # column indices for some records used here, with 0 as the first.
+        # column indices in ASCII file, with 0 as the first.
+        # 
+        # Mandatory columns: x, y, z, d_I, shot_number, range, theta,
+        # phi, sample, line
+        # 
+        # Optional columns: fwhm
         cind = {'range':8, 'sample':12, 'line':13, 'x':0, 'y':1, 'z':2, 'd_I':3, \
                     'shot_number':6, 'theta':9, 'phi':10, 'fwhm':16}
-        self.ind = [cind['x'], cind['y'], cind['z'], cind['d_I'], \
-                        cind['shot_number'], cind['range'], cind['theta'], \
-                        cind['phi'], cind['sample'], cind['line'], cind['fwhm']]
+        self.man_col = 10
+        # column name labels in the order of the columns that actually
+        # exist in your ASCII file from left to right.
+        #
+        # Mandatory columns MUST be BEFORE optional columns.
+        self.ind_label = ('x', 'y', 'z', 'd_I', 'shot_number', 'range', \
+                          'theta', 'phi', 'sample', 'line', 'fwhm')
+        self.ind = [ cind[il] for il in self.ind_label ]
+        self.tot_col = len(self.ind_label)
 
-
+        
     def generateSpectralPoints(self, outfile, union=False, ndiimgfile=None):
         """
         Main function to generate spectral points
@@ -76,8 +87,8 @@ class DWELSpectralPoints:
                                        comments=None)
 
         # update column index in loaded array
-        cind = {'x':0, 'y':1, 'z':2, 'd_I':3, 'shot_number':4, 'range':5, \
-                    'theta':6, 'phi':7, 'sample':8, 'line':9, 'fwhm':10}
+        cind = { il:i for i, il in enumerate(self.ind_label) }
+        
         # index the columns that are used in searching common points
         ind = [cind['range'], cind['sample'], cind['line']]
 
@@ -100,20 +111,23 @@ class DWELSpectralPoints:
         nreturn = len(return_type)
         meanpoints = (nirpoints[np.ix_(nir_ind, ind)] + swirpoints[np.ix_(swir_ind, ind)])/2.0
         outpoints = np.hstack((meanpoints[:, 0:3], \
-                                   nirpoints[nir_ind, cind['d_I']:cind['d_I']+1], \
-                                   swirpoints[swir_ind, cind['d_I']:cind['d_I']+1], \
-                                   return_num.reshape((nreturn, 1)), \
-                                   num_of_returns.reshape((nreturn, 1)), \
-                                   nu_shotnum.reshape((nreturn, 1)), \
-                                   meanpoints[:, 4:9], \
-                                   nirpoints[nir_ind, cind['fwhm']:cind['fwhm']+1], \
-                                   swirpoints[swir_ind, cind['fwhm']:cind['fwhm']+1], \
-                                   return_type.reshape((nreturn, 1)) \
-                                   ))
-
+                               nirpoints[nir_ind, cind['d_I']:cind['d_I']+1], \
+                               swirpoints[swir_ind, cind['d_I']:cind['d_I']+1], \
+                               return_num.reshape((nreturn, 1)), \
+                               num_of_returns.reshape((nreturn, 1)), \
+                               nu_shotnum.reshape((nreturn, 1)), \
+                               meanpoints[:, 4:9], \
+                               nirpoints[nir_ind, cind[self.ind_label[self.man_col]]:cind[self.ind_label[self.tot_col-1]]+1], \
+                               swirpoints[swir_ind, cind[self.ind_label[self.man_col]]:cind[self.ind_label[self.tot_col-1]]+1], \
+                               return_type.reshape((nreturn, 1)) \
+                               ))
+        
         prefixstr = "[DWEL Dual-wavelength Point Cloud Data by {0:s}]\n".format("Union" if self.union else "Intersect") \
             +"Run made at: "+time.strftime("%c")+"\n"
-        headerstr = prefixstr + "x,y,z,d_I_nir,d_I_swir,return_number,number_of_returns,shot_number,range,theta,phi,sample,line,fwhm_nir,fwhm_swir,qa,r,g,b"
+        headerstr = prefixstr + "x,y,z,d_I_nir,d_I_swir,return_number,number_of_returns,shot_number,range,theta,phi,sample,line," \
+                    + ",".join([ il+"_nir" for il in self.ind_label[self.man_col:self.tot_col] ]) + "," \
+                    + ",".join([ il+"_swir" for il in self.ind_label[self.man_col:self.tot_col] ]) + "," \
+                    + "qa,r,g,b"
 
         if not(self.union):
             # spectral points by intersect
@@ -133,7 +147,8 @@ class DWELSpectralPoints:
             outpoints = np.hstack((outpoints, rgbpoints))
 
             print "Saving dual-wavelength points: "+str(nir_ind.size)
-            fmtstr = "%.3f "*5 + "%d "*3 + "%.3f "*3 + "%d "*2 + "%.3f "*2 + "%d "*4
+            fmtstr = "%.3f "*5 + "%d "*3 + "%.3f "*3 + "%d "*2 \
+                     + "%.3f "*2*(self.tot_col-self.man_col) + "%d "*4
             fmtstr = fmtstr.strip().split(" ")
             np.savetxt(outfile, outpoints, delimiter=',', fmt=fmtstr, \
                 header=headerstr.rstrip(), comments='')
@@ -162,23 +177,25 @@ class DWELSpectralPoints:
                 swirpoints[swir_unpind[tmpflag], cind['d_I']] = 0.0
 
             nir2swir_points = np.hstack(( nirpoints[nir_unpind, 0:3], \
-                                              nirpoints[nir_unpind, cind['d_I']:cind['d_I']+1], \
-                                              nir2swir_amp.reshape((len(nir2swir_amp), 1)), \
-                                              np.zeros((len(nir2swir_amp), 3)), \
-                                              nirpoints[nir_unpind, :][:, 5:10], \
-                                              nirpoints[nir_unpind, cind['fwhm']:cind['fwhm']+1], \
-                                              np.zeros((len(nir2swir_amp), 1)), \
-                                              nir2swir_qa.reshape((len(nir2swir_qa), 1)) \
-                                              ))
+                                          nirpoints[nir_unpind, cind['d_I']:cind['d_I']+1], \
+                                          nir2swir_amp.reshape((len(nir2swir_amp), 1)), \
+                                          np.zeros((len(nir2swir_amp), 3)), \
+                                          nirpoints[nir_unpind, :][:, 5:10], \
+                                          nirpoints[nir_unpind, cind[self.ind_label[self.man_col]]:cind[self.ind_label[self.tot_col-1]]+1], \
+                                          np.zeros((len(nir2swir_amp), 1)), \
+                                          nir2swir_qa.reshape((len(nir2swir_qa), 1)) \
+            ))
+
             swir2nir_points = np.hstack(( swirpoints[swir_unpind, 0:3], \
-                                              swir2nir_amp.reshape((len(swir2nir_amp), 1)), \
-                                              swirpoints[swir_unpind, cind['d_I']:cind['d_I']+1], \
-                                              np.zeros((len(swir2nir_amp), 3)), \
-                                              swirpoints[swir_unpind, :][:, 5:10], \
-                                              np.zeros((len(swir2nir_amp), 1)), \
-                                              swirpoints[swir_unpind, cind['fwhm']:cind['fwhm']+1], \
-                                              swir2nir_qa.reshape((len(swir2nir_qa), 1)) \
-                                              ))
+                                          swir2nir_amp.reshape((len(swir2nir_amp), 1)), \
+                                          swirpoints[swir_unpind, cind['d_I']:cind['d_I']+1], \
+                                          np.zeros((len(swir2nir_amp), 3)), \
+                                          swirpoints[swir_unpind, :][:, 5:10], \
+                                          np.zeros((len(swir2nir_amp), 1)), \
+                                          swirpoints[swir_unpind, cind[self.ind_label[self.man_col]]:cind[self.ind_label[self.tot_col-1]]+1], \
+                                          swir2nir_qa.reshape((len(swir2nir_qa), 1)) \
+            ))
+
             unionoutpoints = np.vstack(( outpoints, nir2swir_points, swir2nir_points ))
             sortind, num_of_returns, return_num, shotind = \
                 self.updateReturnNum(unionoutpoints[:, [8, 11, 12]].copy())
@@ -203,7 +220,9 @@ class DWELSpectralPoints:
             unionoutpoints = np.hstack((unionoutpoints, rgbpoints))
             
             print "Saving dual-wavelength points: "+str(len(unionoutpoints))
-            fmtstr = "%.3f "*5 + "%d "*3 + "%.3f "*3 + "%d "*2 + "%.3f "*2 + "%d "*4
+
+            fmtstr = "%.3f "*5 + "%d "*3 + "%.3f "*3 + "%d "*2 \
+                     + "%.3f "*2*(self.tot_col-self.man_col) + "%d "*4
             fmtstr = fmtstr.strip().split(" ")
             np.savetxt(outfile, unionoutpoints, delimiter=',', fmt=fmtstr, \
                 header=headerstr.rstrip(), comments='')
@@ -308,7 +327,7 @@ class DWELSpectralPoints:
         old_swir_shotind = np.copy(swir_shotind)
 
         # find out the points with common (sample, line)
-        print "Searching common points"
+        print "\tSearching points with common (sample, line), i.e. same laser shot"
         commonpts = np.intersect1d(nir_shotind, swir_shotind)
         nir_in = np.in1d(nir_shotind, commonpts)
         swir_in = np.in1d(swir_shotind, commonpts)
@@ -331,7 +350,7 @@ class DWELSpectralPoints:
         # find out locations of common points that have duplicates in select nir and
         # swir points, and the indices of their occurrences in the select nir and
         # swir points.
-        print "Searching duplicate points"
+        print "\tSearching duplicate points from the same laser shot due to multi-returns"
         nir_u, nir_ind, nir_invind, nir_ucount= np.unique(nir_shotind, return_index=True, return_inverse=True, return_counts=True)
         swir_u, swir_ind, swir_invind, swir_ucount= np.unique(swir_shotind, return_index=True, return_inverse=True, return_counts=True)
         # because we already searched common points earlier, the nir_u and swir_u
