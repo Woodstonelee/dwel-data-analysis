@@ -42,14 +42,15 @@ class DWELSpectralPoints:
         # One or more optional columns: fwhm
         cind = {'range':8, 'sample':12, 'line':13, 'x':0, 'y':1, 'z':2, \
                 'd_I':3, 'shot_number':6, 'theta':9, 'phi':10, \
-                'fwhm':16, 'band':14}
+                'fwhm':16, 'band':14, 'd0':15}
         # Below ind_label lists column name labels in the order of the
         # columns that actually exist in your ASCII file.
         #
         # Mandatory columns MUST be BEFORE optional columns in the
         # following list. 
         self.ind_label = ('x', 'y', 'z', 'd_I', 'shot_number', 'range', \
-                          'theta', 'phi', 'sample', 'line')
+                          'theta', 'phi', 'sample', 'line', \
+                          'd0')
         # ------------------------------------------------------------
 
         self.ind = [ cind[il] for il in self.ind_label ]

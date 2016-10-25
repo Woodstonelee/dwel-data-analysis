@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+
 """
 Classify points in a dual-wavelength spectral point cloud from a DWEL scan.
 """
@@ -7,26 +8,68 @@ import sys
 import os
 import argparse
 
+import numpy as np
+
 from dwel_points_cluster import DWELPointsCluster
+from dwel_points_supvcls import DWELPointsClassifier
 
 def getCmdArgs():
     p = argparse.ArgumentParser(description="Classify dual-wavelength spectral point cloud from a DWEL scan")
 
-    p.add_argument("-i", '--infile', dest="infile", default="/projectnb/echidna/lidar/DWEL_Processing/HF2014/Hardwood20140919/spectral-points-by-union/HFHD_20140919_dual_points/HFHD_20140919_C_dual_cube_bsfix_pxc_update_atp2_ptcl_points.txt", help="Input dual-wavelength spectral point cloud")
-    p.add_argument("-o", '--outfile', dest="outfile", default="/projectnb/echidna/lidar/DWEL_Processing/HF2014/tmp-test-data/HFHD_20140919_C_dual_cube_bsfix_pxc_update_atp2_ptcl_points_kmeans.txt", help="Output file of classified point cloud")
-    p.add_argument("--classifier", dest="classifier", choices=['KMeans', 'NDI'], default="KMeans")
+    p.add_argument("-i", '--infile', dest="infile", required=False, default=None, help="Input dual-wavelength spectral point cloud")
+    p.add_argument("-m", "--mscfile", dest="mscfile", default=None, help="MSC (Multi-Scale Characteristics) file from CANUPO processing as spatial information for classification")    
+    p.add_argument("-o", '--outfile', dest="outfile", required=True, default=None, help="Output file of classified point cloud")
+    
+    p.add_argument("--classifier", dest="classifier", choices=['Spectral-KMeans', 'Spatial-KMeans', 'Spectral-Spatial-KMeans', \
+                                                               'Spectral-RF', 'Spatial-RF', 'Spectral-Spatial-RF'], default="Spectral-KMeans")
 
-    kmeans_p = p.add_argument_group("KMeans clustering", "Options for Kmeans clustering")
-    kmeans_p.add_argument("--nclusters", dest="n_clusters", type=int, default=100, help="Number of clusters to generate by KMeans")
+    p.add_argument("--nclusters", dest="n_clusters", type=int, default=100, help="Number of clusters to generate by clustering")
 
+    p.add_argument('--train_spectral', dest='train_spec', nargs='+', default=None, help="List of spectral point cloud files for training Random Forest classifier, with each file for one class.")
+    p.add_argument('--train_spatial', dest='train_spa', nargs='+', default=None, help='List of MSC files for training Random Forest classifier, with each file for one class.')
+
+    p.add_argument("-M", "--multiout", dest="multiout", default=False, action="store_true", help="Output classification into mulitiple files, one file for one class for easy display in CloudCompare. Default: false")
+    
     p.add_argument("-v", "--verbose", dest='verbose', default=False, action='store_true', help='Turn on verbose. Default: false')
 
     cmdargs = p.parse_args()
 
-    if (cmdargs.infile is None) or (cmdargs.outfile is None):
+    if (cmdargs.outfile is None):
         p.print_help()
-        print "Input and output files are required"
+        print "Output file of classification or clustering is required"
         sys.exit()
+
+    if ((cmdargs.classifier == "Spectral-Spatial-KMeans") \
+        or (cmdargs.classifier == "Spectral-KMeans") \
+        or (cmdargs.classifier == 'Spectral-Spatial-RF') \
+        or (cmdargs.classifier == 'Spectral-RF')) \
+       and (cmdargs.infile is None):
+        p.print_help()
+        print "Spectral points file is required for the classifiers using spectral attibutes: Spectral-KMeans, Spectral-Spatial-KMeans, Spectral-RF and Spectral-Spatial-RF"
+        sys.exit()
+        
+    if ((cmdargs.classifier == "Spectral-Spatial-KMeans") \
+        or (cmdargs.classifier == "Spatial-KMeans") \
+        or (cmdargs.classifier == 'Spectral-Spatial-RF') \
+        or (cmdargs.classifier == 'Spatial-RF')) \
+       and (cmdargs.mscfile is None):
+        p.print_help()
+        print "MSC file is required for the classifiers using spatial attibutes: Spatial-KMeans, Spectral-Spatial-KMeans, Spatial-RF and Spectral-Spatial-RF"
+        sys.exit()
+
+    if (cmdargs.classifier == 'Spectral-Spatial-RF') \
+       and (cmdargs.train_spec is None or cmdargs.train_spa is None):
+        p.print_help()
+        print "Training files of spectral point clouds and MSC data are required for the classifier, Spectral-Spatial-RF"
+        sys.exit()
+    if (cmdargs.classifier == 'Spectral-RF') \
+       and (cmdargs.train_spec is None):
+        p.print_help()
+        print 'Training files of spectral point clouds are required for the classifier, Spectral-RF'
+    if (cmdargs.classifier == 'Spatial-RF') \
+       and (cmdargs.train_spa is None):
+        p.print_help()
+        print 'Training files of MSC data are required for the classifier, Spatial-RF'
 
     return cmdargs
 
@@ -36,12 +79,51 @@ def main(cmdargs):
     classifier = cmdargs.classifier
     n_clusters = cmdargs.n_clusters
     verbose = cmdargs.verbose
+    mscfile = cmdargs.mscfile
+    multiout = cmdargs.multiout
 
-    if classifier == "KMeans":
-        dpc = DWELPointsCluster(infile, verbose)
-        dpc.kmeans(n_clusters)
-        dpc.writeClusterLabels(outfile)
 
+    print "Start {0:s}".format(classifier)
+    
+    if classifier == "Spectral-KMeans":
+        dpc = DWELPointsCluster(verbose)
+        dpc.specKmeans(n_clusters, infile)
+        dpc.writeClusterLabels(outfile, multiout)
+
+    if classifier == "Spatial-KMeans":
+        dpc = DWELPointsCluster(verbose)
+        dpc.spaKmeans(n_clusters, infile, mscfile)
+        dpc.writeClusterLabels(outfile, multiout)        
+
+    if classifier == "Spectral-Spatial-KMeans":
+        dpc = DWELPointsCluster(verbose)
+        dpc.ssKmeans(n_clusters, infile, mscfile)
+        dpc.writeClusterLabels(outfile, multiout)
+
+    if classifier == 'Spectral-Spatial-RF':
+        dpc = DWELPointsClassifier(verbose)
+        pred_labels, pred_proba = dpc.runRandomForest(spectral_points_file=infile, \
+                                                      msc_file=mscfile, \
+                                                      spectral_training_files=cmdargs.train_spec,
+                                                      msc_training_files=cmdargs.train_spa, \
+                                                      n_estimators=100, n_jobs=-1)
+        dpc.writeClassification(outfile, pred_labels, pred_proba=pred_proba, spectral_points_file=infile, msc_file=mscfile)
+
+    if classifier == 'Spectral-RF':
+        dpc = DWELPointsClassifier(verbose)
+        pred_labels, pred_proba = dpc.runRandomForest(spectral_points_file=infile, \
+                                                      spectral_training_files=cmdargs.train_spec,
+                                                      n_estimators=100, n_jobs=-1)
+        dpc.writeClassification(outfile, pred_labels, pred_proba=pred_proba, spectral_points_file=infile)
+        
+    if classifier == 'Spatial-RF':
+        dpc = DWELPointsClassifier(verbose)
+        pred_labels, pred_proba = dpc.runRandomForest(msc_file=mscfile, \
+                                                      msc_training_files=cmdargs.train_spa, \
+                                                      n_estimators=100, n_jobs=-1)
+        dpc.writeClassification(outfile, pred_labels, pred_proba=pred_proba, msc_file=mscfile, spectral_points_file=infile)
+
+        
 if __name__ == "__main__":
     cmdargs = getCmdArgs()
     main(cmdargs)

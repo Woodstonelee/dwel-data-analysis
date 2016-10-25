@@ -60,7 +60,7 @@ struct MSCFile {
     MSCFile(const char* name) {
         realfile.open(name, std::ifstream::binary);
     }
-    ~MSCFile() {realfile.close();}
+    ~MSCFile() {realfile.close(); /*std::cout<<"~MSCFile"<<std::endl;*/}
     template<typename T> void read(T& value) {
         realfile.read((char*)&value, sizeof(T));
         offset = realfile.tellg();

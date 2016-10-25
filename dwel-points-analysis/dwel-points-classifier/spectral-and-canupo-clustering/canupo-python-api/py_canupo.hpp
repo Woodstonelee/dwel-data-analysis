@@ -30,17 +30,19 @@ private:
   int nscales;
   int read_header(std::vector<FloatType>& scales, int& ptnparams);
   std::vector<FloatType> param;
-  std::vector<FloatType> data;
+  std::vector<FloatType> data1, data2;
+  // std::vector<size_t> linenum;
   int fooi;
   size_t data_start_pos;
   size_t point_data_len;
-  size_t linenum;
 
 public:
   py_MSCFile(const char* name);
+  ~py_MSCFile();
   size_t next_pt_idx=0;
   
   bp::tuple py_get_header();
-  bp::tuple py_read_point(size_t pt_idx, bool convert_from_tri_to_2D);  
+  bp::tuple py_read_point(size_t pts_num, size_t pt_idx, bool convert_from_tri_to_2D);
+  int py_read_reset();
 };
 BOOST_PYTHON_MEMBER_FUNCTION_OVERLOADS(py_MSCFile_py_read_point_overloads, py_read_point, 0, 2)
