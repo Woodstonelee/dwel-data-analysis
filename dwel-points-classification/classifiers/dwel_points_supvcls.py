@@ -7,8 +7,6 @@ import numpy as np
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.cross_validation import train_test_split
 from sklearn import cross_validation
-# from sklearn.preprocessing import StandardScaler
-from sklearn.metrics import confusion_matrix
 
 import dwel_points_utils as dpu
 
@@ -39,19 +37,38 @@ class DWELPointsClassifier:
         # read training data
         train_X, train_y = self.readTraining(spectral_training_files, msc_training_files)
 
+        # set up a string to show the features to be used
+        feature_names = ["" for i in range(train_X.shape[1])]
+        nfeatures = len(feature_names)
+        f_idx = 0
+        if spectral_training_files is not None:
+            feature_names[0] = 'ndi'
+            feature_names[1] = 'd_I_nir'
+            feature_names[2] = 'd_I_swir'
+            f_idx = 3
+        if msc_training_files is not None:
+            tmp = int((nfeatures - f_idx)/2)
+            for i in range(tmp):
+                feature_names[f_idx+i] = 'msc_a_{0:d}'.format(i+1)
+            f_idx = f_idx+tmp
+            for i in range(tmp):
+                feature_names[f_idx+i] = 'msc_b_{0:d}'.format(i+1)
+
         # Initialize RF classifier
         rf = RandomForestClassifier(**params)
 
         # Cross validation
         cv_train_X, cv_test_X, cv_train_y, cv_test_y = train_test_split(train_X, train_y, test_size=0.25, stratify=train_y)
         rf.fit(cv_train_X, cv_train_y)
-        print "Cross validation with 25% stratified samples as test: {0:3f}".format(rf.score(cv_test_X, cv_test_y))
+        print "Cross validation with 25% stratified samples in the test: {0:3f}".format(rf.score(cv_test_X, cv_test_y))
         
         # train RF
         print "Training Random Forest with all training data samples ..."
         rf.fit(train_X, train_y)
-        print "Feature importance: "
-        print rf.feature_importances_
+        print "Features and their importance for the classification:"
+        print ','.join([fn for fn in feature_names])
+        fmtstr = ','.join(['{{0[{0:d}]:.6f}}'.format(i) for i in range(nfeatures)])
+        print fmtstr.format(rf.feature_importances_)
 
         # predict labels
 
@@ -66,6 +83,7 @@ class DWELPointsClassifier:
                 raise RuntimeError("Input spectral points file and MSC file have different number of points! Check your inputs!")
         else:
             npts = len(spec_points)
+
         nbatch = int(npts/self.pf_npts) + 1
         beg_idx = np.arange(nbatch, dtype=np.int)*int(self.pf_npts)
         end_idx = np.copy(beg_idx)
@@ -97,7 +115,10 @@ class DWELPointsClassifier:
         if self.verbose:
             sys.stdout.write('100\n')
             sys.stdout.flush()
-        
+
+        if msc_file is not None:
+            mscfobj.close()
+
         return pred_labels, pred_proba
             
             
@@ -121,8 +142,9 @@ class DWELPointsClassifier:
                 class_labels = np.arange(nmscf) + 1
             if len(class_labels) != nmscf:
                 raise RuntimeError("Number of given class labels is different from that of given MSC training files")
-            msc_training_list = [dpu.openMSC(fname).read() \
-                                 for fname in msc_training_files]
+            msc_fobj_list = [dpu.openMSC(fname) for fname in msc_training_files]
+            msc_training_list = [fobj.read() for fobj in msc_fobj_list]
+            _ = [fobj.close() for fobj in msc_fobj_list]
 
         data_list = list()
         y_list = list()
@@ -218,7 +240,8 @@ class DWELPointsClassifier:
                             progress_cnt = progress_cnt + 1
                     if self.verbose:
                         sys.stdout.write('100\n')
-                        sys.stdout.flush()                        
+                        sys.stdout.flush()
+                mscfobj.close()
         else:
             spec_header = dpu._dwel_points_ascii_scheme['skip_header']
             if msc_file is not None:
@@ -226,16 +249,14 @@ class DWELPointsClassifier:
                 out_file_spec = '.'.join(out_file.split('.')[0:-1]) + '_spectral.txt'
                 print ""
                 print "Classification result will be written twice in two files with one attaching spectral attributes and the other spatial attibutes:"
-                print "Attaching class with spectral attributes to: "
-                print "\t{0:s}".format(out_file_spec)
-                print "Attaching class with spatial attributes to: "
-                print "\t{0:s}".format(out_file_msc)
             else:
                 out_file_spec = out_file
             
             with open(spectral_points_file) as specfobj, open(out_file_spec, 'w') as outfobj:
+                print "Attaching class with spectral attributes to: "
+                print "\t{0:s}".format(out_file_spec)
                 if self.verbose:
-                    sys.stdout.write('\tAttaching spectral attributes\n\tpercent ...')
+                    sys.stdout.write('\tpercent ...')
                 for i in range(spec_header-1):
                     outfobj.write("{0:s}".format(specfobj.readline()))
                 if pred_proba is None:
@@ -279,10 +300,15 @@ class DWELPointsClassifier:
                              + '{1:d},{2:.3f},' \
                              + ','.join(['{{3[{0:d}]:.3f}},{{3[{1:d}]:.3f}}'.format(i, i+nscales) for i in range(nscales)]) \
                              + '\n'
-                with open(out_file_msc, 'w') as outfobj:
+                with open(spectral_points_file) as specfobj, open(out_file_msc, 'w') as outfobj:
+                    print "Attaching class with spatial attributes to: "
+                    print "\t{0:s}".format(out_file_msc)
                     if self.verbose:
-                        sys.stdout.write('\tAttaching spatial attributes\n\tpercent ...')
+                        sys.stdout.write('\tpercent ...')
                         progress_cnt=1
+                    for i in range(spec_header-1):
+                        outfobj.write("{0:s}".format(specfobj.readline()))
+
                     outfobj.write('{0:s}\n'.format(headerstr))
                     for n, (bi, ei) in enumerate(itertools.izip(beg_idx, end_idx)):
                         msc_data = mscfobj.read(npts=self.pf_npts)
@@ -299,3 +325,4 @@ class DWELPointsClassifier:
                     if self.verbose:
                         sys.stdout.write('100\n')
                         sys.stdout.flush()
+                mscfobj.close()

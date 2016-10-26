@@ -45,9 +45,24 @@ class MSCFile:
         self.next_pt_idx = 0
 
     def read(self, npts=None, start=None, use_scales=None):
-        """
-        Read data from MSC file, one batch at one time, number of
-        points to read on every call, self.birch.pf_npts
+        """Read data from MSC file, one batch at one time, number of points
+        to read on every call, self.birch.pf_npts
+
+        Parameters: **npts**, *int*
+
+        Returns: **mscdata**, *2D numpy array*
+                   (npts, nscales*2+1), *npts* is the number of points
+                   being read out, either given by the parameter
+                   *npts* or all the points in the MSC file; *nscales*
+                   is the number of scales being read out, either
+                   given by the paramter *use_scales* or all the
+                   scales in the MSC file. Each scale has two values,
+                   *a* as the 1D component and *b* as the 2D
+                   component. The first *nscales* columns are *a* and
+                   the second *nscales* columns are *b*. The extra
+                   last column is the line number of each point in its
+                   original ASCII point cloud that has generated this
+                   MSC file.
         """
         mscheader = self.header
 
