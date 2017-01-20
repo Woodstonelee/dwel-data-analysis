@@ -46,6 +46,6 @@ OLD=${1}
 NEW=${2}
 
 head -n 3 ${OLD} | tail -n 1 > ${NEW}
-echo "// "$(head -n 1 HFHD_20140919_C_1064_cube_bsfix_pxc_update_atp2_ptcl_points.txt | tail -n 1) >> ${NEW}
-echo "// "$(head -n 2 HFHD_20140919_C_1064_cube_bsfix_pxc_update_atp2_ptcl_points.txt | tail -n 1) >> ${NEW}
+echo "// "$(head -n 1 ${OLD} | tail -n 1) >> ${NEW}
+echo "// "$(head -n 2 ${OLD} | tail -n 1) >> ${NEW}
 tail -n +4 ${OLD} >> ${NEW}
