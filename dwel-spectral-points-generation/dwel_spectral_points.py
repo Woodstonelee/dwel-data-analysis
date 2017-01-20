@@ -32,47 +32,57 @@ class DWELSpectralPoints:
         # ------------------------------------------------------------
         # Set some parameters according to your own input point
         # clouds.
+        # scale factor of your point intensity
         self.i_scale = 1000.0
-        self.headerlines = 3
-        # Column indices in ASCII file, with 0 as the first.
-        # 
-        # Ten mandatory columns: x, y, z, d_I, shot_number, range,
-        # theta, phi, sample, line
-        # 
-        # One or more optional columns: fwhm
-        cind = {'range':8, 'sample':12, 'line':13, 'x':0, 'y':1, 'z':2, \
-                'd_I':3, 'shot_number':6, 'theta':9, 'phi':10, \
-                'fwhm':16, 'band':14, 'd0':15}
-        # Below ind_label lists column name labels in the order of the
-        # columns that actually exist in your ASCII file.
+        # string to indicate start of a comment line
+        self.comments = "//"
+        # ind_label lists column name labels that will be read from
+        # your point cloud. Convert all the names to LOWER case.
         #
+        # You must include ten mandatory columns: x, y, z, d_I, shot_number, range,
+        # theta, phi, sample, line.
+        # 
         # Mandatory columns MUST be BEFORE optional columns in the
         # following list. 
-        self.ind_label = ('x', 'y', 'z', 'd_I', 'shot_number', 'range', \
+        self.ind_label = ('x', 'y', 'z', 'd_i', 'shot_number', 'range', \
                           'theta', 'phi', 'sample', 'line', \
                           'd0')
         # ------------------------------------------------------------
 
-        self.ind = [ cind[il] for il in self.ind_label ]
+        self.headerlines = 0
         self.man_col = 10
         self.tot_col = len(self.ind_label)
-
+        self.arr_dtype = np.float32
 
     def inferColDataType(self):
         # infer the data type of columns in the ASCII data file
         with open(self.nirfile, 'r') as nirptsfobj:
             for i in range(self.headerlines):
                 nirptsfobj.readline()
-            nir_line = nirptsfobj.readline()
-            nir_col_str = nir_line.split(',')
-            nir_col_dtype = [ self._inferDataType(ncs.strip()) for ncs in nir_col_str ]
+            line_cnt = 0
+            for nir_line in nirptsfobj:
+                if nir_line.lstrip().find(self.comments) == 0:
+                    continue
+                else:
+                    line_cnt = line_cnt + 1
+                if line_cnt >= 2:
+                    nir_col_str = nir_line.split(',')
+                    nir_col_dtype = [ self._inferDataType(ncs.strip()) for ncs in nir_col_str ]
+                    break
 
         with open(self.swirfile, 'r') as swirptsfobj:
             for i in range(self.headerlines):
                 swirptsfobj.readline()
-            swir_line = swirptsfobj.readline()
-            swir_col_str = swir_line.split(',')
-            swir_col_dtype = [ self._inferDataType(ncs.strip()) for ncs in swir_col_str ]
+            line_cnt = 0
+            for swir_line in swirptsfobj:
+                if swir_line.lstrip().find(self.comments) == 0:
+                    continue
+                else:
+                    line_cnt = line_cnt + 1
+                if line_cnt >= 2:
+                    swir_col_str = swir_line.split(',')
+                    swir_col_dtype = [ self._inferDataType(ncs.strip()) for ncs in swir_col_str ]
+                    break
 
         for ncd, scd in zip(nir_col_dtype, swir_col_dtype):
             if ncd != scd:
@@ -80,7 +90,16 @@ class DWELSpectralPoints:
                               + "Use detected data types of the columns in NIR ASCII point cloud file"
                 warnings.warn(warning_msg, RuntimeWarning)
 
-        return nir_col_dtype
+        testpoints = np.genfromtxt(self.nirfile, \
+                                   delimiter=',', skip_header=self.headerlines, \
+                                   filling_values=np.nan, usemask=False, \
+                                   names=True, case_sensitive="lower", comments=self.comments, \
+                                   max_rows=1)
+        ind = np.zeros(len(self.ind_label), dtype=int)
+        for i, nm in enumerate(self.ind_label):
+            ind[i] = np.where(np.in1d(testpoints.dtype.names, nm))[0][0]
+
+        return {nm:nir_col_dtype[i] for nm, i in zip(self.ind_label, ind)}
                 
 
     def _inferDataType(self, num_str):
@@ -97,6 +116,7 @@ class DWELSpectralPoints:
         """
         Main function to generate spectral points
         """
+
         if union and (ndiimgfile is None):
             raise RuntimeError("You must provdie a gap-filled NDI image to generation spectral points from the union of two point clouds")
         self.union = union
@@ -118,15 +138,17 @@ class DWELSpectralPoints:
 
         # read points from text file
         print "Loading points"
-        nirpoints = np.genfromtxt(nirfile, dtype=np.float32, usecols=self.ind, \
-                                      delimiter=',', skip_header=self.headerlines, \
-                                      filling_values=np.nan, usemask=False, \
-                                      comments=None)
+        nirpoints = np.genfromtxt(nirfile, dtype=self.arr_dtype, usecols=self.ind_label, \
+                                  delimiter=',', skip_header=self.headerlines, \
+                                  filling_values=np.nan, usemask=False, \
+                                  names=True, case_sensitive="lower", comments=self.comments)
+        swirpoints = np.genfromtxt(swirfile, dtype=self.arr_dtype, usecols=self.ind_label, \
+                                   delimiter=',', skip_header=self.headerlines, \
+                                   filling_values=np.nan, usemask=False, \
+                                   names=True, case_sensitive="lower", comments=self.comments)
+        nirpoints = nirpoints.view(self.arr_dtype).reshape(nirpoints.shape+(-1,))
+        swirpoints = swirpoints.view(self.arr_dtype).reshape(swirpoints.shape+(-1,))
 
-        swirpoints = np.genfromtxt(swirfile, dtype=np.float32, usecols=self.ind, \
-                                      delimiter=',', skip_header=self.headerlines, \
-                                      filling_values=np.nan, usemask=False, \
-                                       comments=None)
 
         # update column index in loaded array
         cind = { il:i for i, il in enumerate(self.ind_label) }
@@ -154,8 +176,8 @@ class DWELSpectralPoints:
         meanpoints = (nirpoints[np.ix_(nir_ind, ind)] + swirpoints[np.ix_(swir_ind, ind)])/2.0
         if self.man_col < self.tot_col:
             outpoints = np.hstack((meanpoints[:, 0:3], \
-                                   nirpoints[nir_ind, cind['d_I']:cind['d_I']+1], \
-                                   swirpoints[swir_ind, cind['d_I']:cind['d_I']+1], \
+                                   nirpoints[nir_ind, cind['d_i']:cind['d_i']+1], \
+                                   swirpoints[swir_ind, cind['d_i']:cind['d_i']+1], \
                                    return_num.reshape((nreturn, 1)), \
                                    num_of_returns.reshape((nreturn, 1)), \
                                    nu_shotnum.reshape((nreturn, 1)), \
@@ -166,8 +188,8 @@ class DWELSpectralPoints:
             ))
         else:
             outpoints = np.hstack((meanpoints[:, 0:3], \
-                                   nirpoints[nir_ind, cind['d_I']:cind['d_I']+1], \
-                                   swirpoints[swir_ind, cind['d_I']:cind['d_I']+1], \
+                                   nirpoints[nir_ind, cind['d_i']:cind['d_i']+1], \
+                                   swirpoints[swir_ind, cind['d_i']:cind['d_i']+1], \
                                    return_num.reshape((nreturn, 1)), \
                                    num_of_returns.reshape((nreturn, 1)), \
                                    nu_shotnum.reshape((nreturn, 1)), \
@@ -175,18 +197,18 @@ class DWELSpectralPoints:
                                    return_type.reshape((nreturn, 1)) \
             ))            
         
-        prefixstr = "[DWEL Dual-wavelength Point Cloud Data by {0:s}]\n".format("Union" if self.union else "Intersect") \
-            +"Run made at: "+time.strftime("%c")+"\n"
-        headerstr = prefixstr + "x,y,z,d_I_nir,d_I_swir,return_number,number_of_returns,shot_number,range,theta,phi,sample,line," \
+        headerstr = "x,y,z,d_I_nir,d_I_swir,return_number,number_of_returns,shot_number,range,theta,phi,sample,line," \
                     + ",".join([ il+"_nir" for il in self.ind_label[self.man_col:self.tot_col] ]) + "," \
                     + ",".join([ il+"_swir" for il in self.ind_label[self.man_col:self.tot_col] ]) + "," \
-                    + "qa,r,g,b"
+                    + "qa,r,g,b\n" \
+                    + "{0:s} [DWEL Dual-wavelength Point Cloud Data by {1:s}]\n".format(self.comments, "Union" if self.union else "Intersect") \
+                    + "{0:s} Run made at: {1:s} using NIR ({2:s}) + SWIR ({3:s})\n".format(self.comments, time.strftime("%c"), nirfile, swirfile)
         # format string
         if self.man_col < self.tot_col:
             col_dtype = self.inferColDataType()
             fmtstr = "%.3f "*5 + "%d "*3 + "%.3f "*3 + "%d "*2 \
-                     + " ".join([ col_dtype[ci] for ci in self.ind[self.man_col:self.tot_col] ]) + " " \
-                     + " ".join([ col_dtype[ci] for ci in self.ind[self.man_col:self.tot_col] ]) + " " \
+                     + " ".join([ col_dtype[ci] for ci in self.ind_label[self.man_col:self.tot_col] ]) + " " \
+                     + " ".join([ col_dtype[ci] for ci in self.ind_label[self.man_col:self.tot_col] ]) + " " \
                      + "%d "*4
         else:
             col_dtype = self.inferColDataType()
@@ -222,7 +244,7 @@ class DWELSpectralPoints:
             swir_unpind = intersectout[7]
             nir_unp_nu_shotnum = intersectout[8]
             swir_unp_nu_shotnum = intersectout[9]
-            ind = [cind['d_I'], cind['sample'], cind['line']]
+            ind = [cind['d_i'], cind['sample'], cind['line']]
             print "\tMatching more point pairs between NIR and SWIR for union approach"
             unionout = self.unionPointClouds(nirpoints[np.ix_(nir_unpind, ind)], \
                                                  swirpoints[np.ix_(swir_unpind, ind)], \
@@ -233,17 +255,17 @@ class DWELSpectralPoints:
             swir2nir_qa = unionout[3]
             
             tmpflag = np.equal(nir2swir_qa, int('111', 2))
-            if np.greater(nirpoints[nir_unpind[tmpflag], cind['d_I']], 1e-10).any():
+            if np.greater(nirpoints[nir_unpind[tmpflag], cind['d_i']], 1e-10).any():
                 warnings.warn("Some no-return shots give non-zero NIR reflectance", RuntimeWarning)
-                nirpoints[nir_unpind[tmpflag], cind['d_I']] = 0.0
+                nirpoints[nir_unpind[tmpflag], cind['d_i']] = 0.0
             tmpflag = np.equal(swir2nir_qa, int('111', 2))
-            if np.greater(swirpoints[swir_unpind[tmpflag], cind['d_I']], 1e-10).any():
+            if np.greater(swirpoints[swir_unpind[tmpflag], cind['d_i']], 1e-10).any():
                 warnings.warn("Some no-return shots give non-zero SWIR reflectance", RuntimeWarning)
-                swirpoints[swir_unpind[tmpflag], cind['d_I']] = 0.0
+                swirpoints[swir_unpind[tmpflag], cind['d_i']] = 0.0
 
             if self.man_col < self.tot_col:
                 nir2swir_points = np.hstack(( nirpoints[nir_unpind, 0:3], \
-                                              nirpoints[nir_unpind, cind['d_I']:cind['d_I']+1], \
+                                              nirpoints[nir_unpind, cind['d_i']:cind['d_i']+1], \
                                               nir2swir_amp.reshape((len(nir2swir_amp), 1)), \
                                               np.zeros((len(nir2swir_amp), 3)), \
                                               nirpoints[nir_unpind, :][:, 5:10], \
@@ -253,7 +275,7 @@ class DWELSpectralPoints:
                 ))
                 swir2nir_points = np.hstack(( swirpoints[swir_unpind, 0:3], \
                                               swir2nir_amp.reshape((len(swir2nir_amp), 1)), \
-                                              swirpoints[swir_unpind, cind['d_I']:cind['d_I']+1], \
+                                              swirpoints[swir_unpind, cind['d_i']:cind['d_i']+1], \
                                               np.zeros((len(swir2nir_amp), 3)), \
                                               swirpoints[swir_unpind, :][:, 5:10], \
                                               np.zeros((len(swir2nir_amp), self.tot_col-self.man_col)), \
@@ -262,7 +284,7 @@ class DWELSpectralPoints:
                 ))
             else:
                 nir2swir_points = np.hstack(( nirpoints[nir_unpind, 0:3], \
-                                              nirpoints[nir_unpind, cind['d_I']:cind['d_I']+1], \
+                                              nirpoints[nir_unpind, cind['d_i']:cind['d_i']+1], \
                                               nir2swir_amp.reshape((len(nir2swir_amp), 1)), \
                                               np.zeros((len(nir2swir_amp), 3)), \
                                               nirpoints[nir_unpind, :][:, 5:10], \
@@ -270,7 +292,7 @@ class DWELSpectralPoints:
                 ))
                 swir2nir_points = np.hstack(( swirpoints[swir_unpind, 0:3], \
                                               swir2nir_amp.reshape((len(swir2nir_amp), 1)), \
-                                              swirpoints[swir_unpind, cind['d_I']:cind['d_I']+1], \
+                                              swirpoints[swir_unpind, cind['d_i']:cind['d_i']+1], \
                                               np.zeros((len(swir2nir_amp), 3)), \
                                               swirpoints[swir_unpind, :][:, 5:10], \
                                               swir2nir_qa.reshape((len(swir2nir_qa), 1)) \
