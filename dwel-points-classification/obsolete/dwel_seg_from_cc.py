@@ -20,10 +20,12 @@ def readCcSeg(cc_seg_file):
                          names=('x', 'y', 'z', 'return_number', 'shot_number'))
 
 def readDwel(dwel_pts_file, delimiter=',', \
-             skip_header=2, names=True, \
+             skip_header=0, names=True, \
              usecols=None, dtype=np.float):
-    return np.genfromtxt(dwel_pts_file, delimiter=delimiter, skip_header=skip_header, \
-                         names=names, usecols=usecols, dtype=dtype)
+    return np.genfromtxt(dwel_pts_file, delimiter=delimiter, \
+                         skip_header=0, names=True, case_sensitive="lower", 
+                         comments="//", usecols=['x', 'y', 'z', 'return_number', 'shot_number'], \
+                         dtype="f,f,f,i,i")
 
 def ccSeg2DwelSeg(dwel_pts_file, cc_seg_file, dwel_seg_file):
     """Segment a DWEL point cloud, *dwel_pts_file*, based on the points
@@ -43,9 +45,7 @@ def ccSeg2DwelSeg(dwel_pts_file, cc_seg_file, dwel_seg_file):
                   points.
     """
     cc_seg_pts = readCcSeg(cc_seg_file)
-    dwel_pts = readDwel(dwel_pts_file, \
-                        usecols=['x', 'y', 'z', 'return_number', 'shot_number'], \
-                        dtype="f,f,f,i,i")
+    dwel_pts = readDwel(dwel_pts_file)
 
     in_flag = np.in1d(dwel_pts[['return_number', 'shot_number']], cc_seg_pts[['return_number', 'shot_number']])
 
@@ -57,9 +57,10 @@ def ccSeg2DwelSeg(dwel_pts_file, cc_seg_file, dwel_seg_file):
 
     skip_header = 3
     with open(dwel_pts_file, 'r') as dfobj, open(dwel_seg_file, 'w') as sfobj:
-        sfobj.write("{0:s} [CloudCompare segmentation extraction]\n".format(dfobj.readline().rstrip()))
+        # sfobj.write("{0:s} [CloudCompare segmentation extraction]\n".format(dfobj.readline().rstrip()))
+        sfobj.write("{0:s}".format(dfobj.readline()))
         for i in range(1, skip_header):
-            sfobj.write(dfobj.readline())
+            dfobj.readline()
         for flag in in_flag:
             line = dfobj.readline()
             if flag:

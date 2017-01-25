@@ -9,7 +9,7 @@
 # X,Y,Z,d_I,Return_Number,Number_of_Returns,Shot_Number,Run_Number,range,theta,phi,rk,Sample,Line,Band,d0,fwhm
 #
 # New header format:
-# X,Y,Z,d_I,Return_Number,Number_of_Returns,Shot_Number,Run_Number,range,theta,phi,rk,Sample,Line,Band,d0,fwhm
+# // X,Y,Z,d_I,Return_Number,Number_of_Returns,Shot_Number,Run_Number,range,theta,phi,rk,Sample,Line,Band,d0,fwhm
 # // [DWEL Point Cloud Data]
 # // Run made at: Tue Mar 17 21:21:57 2015
 # USAGE:
@@ -27,7 +27,7 @@ Run made at: Tue Mar 17 21:21:57 2015
 X,Y,Z,d_I,Return_Number,Number_of_Returns,Shot_Number,Run_Number,range,theta,phi,rk,Sample,Line,Band,d0,fwhm
 
 New header format:
-X,Y,Z,d_I,Return_Number,Number_of_Returns,Shot_Number,Run_Number,range,theta,phi,rk,Sample,Line,Band,d0,fwhm
+// X,Y,Z,d_I,Return_Number,Number_of_Returns,Shot_Number,Run_Number,range,theta,phi,rk,Sample,Line,Band,d0,fwhm
 // [DWEL Point Cloud Data]
 // Run made at: Tue Mar 17 21:21:57 2015
 
@@ -45,7 +45,7 @@ fi
 OLD=${1}
 NEW=${2}
 
-head -n 3 ${OLD} | tail -n 1 > ${NEW}
+echo "// "$(head -n 3 ${OLD} | tail -n 1) > ${NEW}
 echo "// "$(head -n 1 ${OLD} | tail -n 1) >> ${NEW}
 echo "// "$(head -n 2 ${OLD} | tail -n 1) >> ${NEW}
 tail -n +4 ${OLD} >> ${NEW}

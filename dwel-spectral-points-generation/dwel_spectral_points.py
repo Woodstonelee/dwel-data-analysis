@@ -197,7 +197,7 @@ class DWELSpectralPoints:
                                    return_type.reshape((nreturn, 1)) \
             ))            
         
-        headerstr = "x,y,z,d_I_nir,d_I_swir,return_number,number_of_returns,shot_number,range,theta,phi,sample,line," \
+        headerstr = "{0:s} x,y,z,d_I_nir,d_I_swir,return_number,number_of_returns,shot_number,range,theta,phi,sample,line,".format(self.comments) \
                     + ",".join([ il+"_nir" for il in self.ind_label[self.man_col:self.tot_col] ]) + "," \
                     + ",".join([ il+"_swir" for il in self.ind_label[self.man_col:self.tot_col] ]) + "," \
                     + "qa,r,g,b\n" \
