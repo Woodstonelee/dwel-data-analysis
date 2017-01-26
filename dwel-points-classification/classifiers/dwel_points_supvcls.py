@@ -177,7 +177,7 @@ class DWELPointsClassifier:
 
     def _prepSpecPoints(self, spectral_points_file):
         data = dpu.loadPoints(spectral_points_file, \
-                              usecols=['d_I_nir', 'd_I_swir', 'range'])
+                              usecols=['d_i_nir', 'd_i_swir', 'range'])
         valid_flag = data[:, 2]>1e-6
         ndi = np.zeros(len(data)) + np.nan
         ndi[valid_flag] = (data[valid_flag, 0] - data[valid_flag, 1]) / (data[valid_flag, 0] + data[valid_flag, 1])
@@ -257,17 +257,21 @@ class DWELPointsClassifier:
                 print "\t{0:s}".format(out_file_spec)
                 if self.verbose:
                     sys.stdout.write('\tpercent ...')
-                for i in range(spec_header-1):
+                for i in range(spec_header):
                     outfobj.write("{0:s}".format(specfobj.readline()))
                 if pred_proba is None:
                     outfobj.write("{0:s},class\n".format(specfobj.readline().strip()))
                 else:
                     outfobj.write("{0:s},class,proba\n".format(specfobj.readline().strip()))
+                comment_linecnt = 0
                 for i, line in enumerate(specfobj):
+                    if line.lstrip().find(dpu._dwel_points_ascii_scheme["comments"]) == 0:
+                        comment_linecnt = comment_linecnt + 1
+                        continue
                     if pred_proba is None:
-                        outfobj.write("{0:s},{1:d}\n".format(line.strip(), pred_labels[i]))
+                        outfobj.write("{0:s},{1:d}\n".format(line.strip(), pred_labels[i-comment_linecnt]))
                     else:
-                        outfobj.write("{0:s},{1:d},{2:.3f}\n".format(line.strip(), pred_labels[i], pred_proba[i]))
+                        outfobj.write("{0:s},{1:d},{2:.3f}\n".format(line.strip(), pred_labels[i-comment_linecnt], pred_proba[i-comment_linecnt]))
                     if self.verbose and (i % int(npts*0.1) == 0):
                         sys.stdout.write("{0:d}...".format(int(float(i)/npts*100)))
                         sys.stdout.flush()
@@ -276,7 +280,6 @@ class DWELPointsClassifier:
                     sys.stdout.flush()
 
             if msc_file is not None:
-                # raise RuntimeError( "Oops! Not there yet! Remove MSC file from the argument and re-run writing classification!")
                 points = dpu.loadPoints(spectral_points_file, usecols=['x', 'y', 'z'])
 
                 mscfobj = dpu.openMSC(msc_file)
@@ -289,13 +292,15 @@ class DWELPointsClassifier:
                 end_idx[0:-1] = beg_idx[1:]
                 end_idx[-1] = int(npts)                
                 if pred_proba is None:
-                    headerstr = 'x,y,z,class,'+','.join(['a_{0:d},b_{0:d}'.format(i+1) for i in range(nscales)])
+                    headerstr = '{0:s} x,y,z,class,'.format(dpu._dwel_points_ascii_scheme['comments']) \
+                                +','.join(['a_{0:d},b_{0:d}'.format(i+1) for i in range(nscales)])
                     fmtstr = ','.join(['{{0[{0:d}]:.6f}}'.format(i) for i in range(3)]) + ',' \
                              + '{1:d},' \
                              + ','.join(['{{2[{0:d}]:.3f}},{{2[{1:d}]:.3f}}'.format(i, i+nscales) for i in range(nscales)]) \
                              + '\n'
                 else:
-                    headerstr = 'x,y,z,class,proba,'+','.join(['a_{0:d},b_{0:d}'.format(i+1) for i in range(nscales)])
+                    headerstr = '{0:s} x,y,z,class,proba,'.format(dpu._dwel_points_ascii_scheme['comments']) \
+                                +','.join(['a_{0:d},b_{0:d}'.format(i+1) for i in range(nscales)])
                     fmtstr = ','.join(['{{0[{0:d}]:.6f}}'.format(i) for i in range(3)]) + ',' \
                              + '{1:d},{2:.3f},' \
                              + ','.join(['{{3[{0:d}]:.3f}},{{3[{1:d}]:.3f}}'.format(i, i+nscales) for i in range(nscales)]) \
@@ -306,10 +311,16 @@ class DWELPointsClassifier:
                     if self.verbose:
                         sys.stdout.write('\tpercent ...')
                         progress_cnt=1
-                    for i in range(spec_header-1):
+                    for i in range(spec_header):
                         outfobj.write("{0:s}".format(specfobj.readline()))
-
                     outfobj.write('{0:s}\n'.format(headerstr))
+                    # specfobj.readline()
+                    # for i, line in enumerate(specfobj):
+                    #     if line.lstrip().find(dpu._dwel_points_ascii_scheme["comments"]) == 0:
+                    #         continue
+                    #     else:
+                    #         break
+
                     for n, (bi, ei) in enumerate(itertools.izip(beg_idx, end_idx)):
                         msc_data = mscfobj.read(npts=self.pf_npts)
                         msc_idx = msc_data[:, -1].astype(int)-1

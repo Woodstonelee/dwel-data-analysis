@@ -5,29 +5,29 @@ import numpy as np
 
 import canupo
 
-_dwel_points_ascii_scheme = {'x':0, 'y':1, 'z':2, 'd_I_nir':3, 'd_I_swir':4, \
+_dwel_points_ascii_scheme = {'skip_header':0, \
+                             'delimiter':",", \
+                             'comments':"//", \
+                             'x':0, 'y':1, 'z':2, 'd_i_nir':3, 'd_i_swir':4, \
                              'return_number':5, 'number_of_returns':6, 'shot_number':7, \
                              'range':8, 'theta':9, 'phi':10, 'sample':11, 'line':12, \
-                             'd0_nir':13, 'd0_swir':14, 'qa':15, 'grd_label':19, \
-                             'skip_header':3}
+                             'd0_nir':13, 'd0_swir':14, 'qa':15, 'grd_label':19 \
+                            }
 
 def loadPoints(inptsfile, usecols=['x', 'y', 'z', \
-                                   'd_I_nir', 'd_I_swir', 'range']):
+                                   'd_i_nir', 'd_i_swir', 'range']):
     """
     Read data from input file and prep data for clustering
     """
 
-    ind = [_dwel_points_ascii_scheme[uc] for uc in usecols]
-    
-    # ind = (_dwel_points_ascii_scheme['d_I_nir'], \
-    #        _dwel_points_ascii_scheme['d_I_swir'], \
-    #        _dwel_points_ascii_scheme['range'], \
-    #        _dwel_points_ascii_scheme['d0_nir'], \
-    #        _dwel_points_ascii_scheme['d0_swir'])
-
-    data = np.genfromtxt(inptsfile, usecols=ind, comments=None, delimiter=',', \
-                          skip_header=_dwel_points_ascii_scheme['skip_header'])
-
+    arr_dtype = np.float64
+    data = np.genfromtxt(inptsfile, dtype=arr_dtype, 
+                         usecols=usecols, names=True, \
+                         case_sensitive="lower", filling_values=np.nan, \
+                         comments=_dwel_points_ascii_scheme['comments'], \
+                         delimiter=_dwel_points_ascii_scheme['delimiter'], \
+                         skip_header=_dwel_points_ascii_scheme['skip_header'])
+    data = data.view(arr_dtype).reshape(data.shape+(-1,))
     return data
 
 def openMSC(mscfile):
