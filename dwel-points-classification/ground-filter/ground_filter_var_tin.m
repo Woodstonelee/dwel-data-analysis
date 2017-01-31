@@ -170,12 +170,22 @@ data = textscan(fid, '%s', 'HeaderLines', dwel_skip_header, 'Delimiter', '\n');
 fclose(fid);
 % files to output filtered ground points in original DWEL formats:
 ground_dwel_pts_file = fullfile(out_dir, [fp2, '_ground', fp3]);
+nonground_dwel_pts_file = fullfile(out_dir, [fp2, '_nonground', fp3]);
 fid = fopen(ground_dwel_pts_file, 'w');
+nfid = fopen(nonground_dwel_pts_file, 'w');
 for i=1:length(header{1})
     fprintf(fid, '%s\n', header{1}{i});
+    fprintf(nfid, '%s\n', header{1}{i});
 end
-for i=1:length(line_num)
-    fprintf(fid, '%s\n', data{1}{line_num(i)});
+ground_flag = zeros(length(data{1}), 1);
+ground_flag(line_num) = 1;
+ground_flag = logical(ground_flag);
+for i=1:length(data{1})
+    if ground_flag(i)
+        fprintf(fid, '%s\n', data{1}{i});
+    else
+        fprintf(nfid, '%s\n', data{1}{i});
+    end
 end
 fclose(fid);
 
