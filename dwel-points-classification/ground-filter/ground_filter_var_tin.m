@@ -69,8 +69,10 @@ InPtsFileName=[fp2, '_refmt4gfvt', fp3];
 
 fprintf('ScanPtsPathName to be processed: %s\n', ScanPtsPathName);
 fprintf('ScanPtsFileName to be processed: %s\n', ScanPtsFileName);
-fprintf('InPtsPathName for the following scripts: %s\n', InPtsPathName);
-fprintf('InPtsFileName for the following scripts: %s\n', InPtsFileName);
+fprintf('Temporary InPtsPathName for the following processing: %s\n', InPtsPathName);
+fprintf('Temporary InPtsFileName for the following processing: %s\n', InPtsFileName);
+
+fprintf('Loading and reformatting point cloud data ... \n');
 
 fid = fopen(fullfile(ScanPtsPathName, ScanPtsFileName));
 data = textscan(fid, repmat('%f', 1, dwel_ncol), 'HeaderLines', dwel_skip_header, 'Delimiter', dwel_delimiter);
@@ -108,13 +110,19 @@ fprintf('Reformatting points ASCII file finished!\n');
 GroundPtsPathName = out_dir;
 GroundPtsFileName = [fp2, '_ground_xyz', fp3];
 
-fprintf('GroundPtsPathName: %s\n', GroundPtsPathName);
-fprintf('GroundPtsFileName: %s\n', GroundPtsFileName);
+fprintf('Output GroundPtsPathName: %s\n', GroundPtsPathName);
+fprintf('Output GroundPtsFileName: %s\n', GroundPtsFileName);
+
+fprintf('Filtering ground with varying-scale TIN ...\n');
 
 xlim(1) = min(x);
 xlim(2) = max(x);
 ylim(1) = min(y);
 ylim(2) = max(y);
+
+extent = [xlim(1), xlim(2), ylim(1), ylim(2)];
+fprintf('XoY bounding box of the point cloud to be filtered: \nminx\tmaxx\tminy\tmaxy\n%.3f\t%.3f\t%.3f\t%.3f\n', ...
+        extent');
 
 NewCutH = mexFilterVarScaleTIN(InPtsPathName, InPtsFileName, ...
                   GroundPtsPathName, GroundPtsFileName, ...
@@ -156,11 +164,14 @@ end
 delete(fullfile(InPtsPathName, InPtsFileName));
 delete(fullfile(InPtsPathName, [InPtsFileName, '.lnum']));
 
-extent = [xlim(1), xlim(2), ylim(1), ylim(2)];
-fprintf('XoY bounding box: \nminx\tmaxx\tminy\tmaxy\n%.3f\t%.3f\t%.3f\t%.3f\n', ...
-        extent');
+fprintf('Extracting/labeling ground points from/to original input DWEL point clouds\n');
 
-fprintf('Extracting ground points from original input DWEL point clouds\n');
+% files to output filtered ground points in original DWEL formats:
+ground_dwel_pts_file = fullfile(out_dir, [fp2, '_ground', fp3]);
+labeled_dwel_pts_file = fullfile(out_dir, [fp2, '_gf', fp3]); % point cloud with ground labels
+
+fprintf('Output of extracted ground points from DWEL point cloud: %s\n', ground_dwel_pts_file);
+fprintf('Output of labeled ground points to DWEL point cloud: %s\n', labeled_dwel_pts_file);
 
 fid = fopen(fullfile(ScanPtsPathName, ScanPtsFileName));
 header = textscan(fid, '%s', dwel_skip_header, 'Delimiter', '\n');
@@ -168,25 +179,35 @@ fclose(fid);
 fid = fopen(fullfile(ScanPtsPathName, ScanPtsFileName));
 data = textscan(fid, '%s', 'HeaderLines', dwel_skip_header, 'Delimiter', '\n');
 fclose(fid);
-% files to output filtered ground points in original DWEL formats:
-ground_dwel_pts_file = fullfile(out_dir, [fp2, '_ground', fp3]);
-nonground_dwel_pts_file = fullfile(out_dir, [fp2, '_nonground', fp3]);
 fid = fopen(ground_dwel_pts_file, 'w');
-nfid = fopen(nonground_dwel_pts_file, 'w');
+nfid = fopen(labeled_dwel_pts_file, 'w');
 for i=1:length(header{1})
     fprintf(fid, '%s\n', header{1}{i});
-    fprintf(nfid, '%s\n', header{1}{i});
+    if i==1
+        fprintf(nfid, '%s,ground_label\n', header{1}{i});
+    else
+        fprintf(nfid, '%s\n', header{1}{i});
+    end
 end
 ground_flag = zeros(length(data{1}), 1);
 ground_flag(line_num) = 1;
 ground_flag = logical(ground_flag);
-for i=1:length(data{1})
+nrows = length(data{1});
+progress_cnt = round(0.1*nrows);
+fprintf('Writing progress percentage: 0');
+for i=1:nrows
     if ground_flag(i)
         fprintf(fid, '%s\n', data{1}{i});
+        fprintf(nfid, '%s,1\n', data{1}{i});
     else
-        fprintf(nfid, '%s\n', data{1}{i});
+        fprintf(nfid, '%s,0\n', data{1}{i});
+    end
+    if mod(i, progress_cnt) == 0
+       fprintf('...%.0f', 100*i/nrows);
     end
 end
+fprintf('\n');
 fclose(fid);
+fclose(nfid);
 
 fprintf('Ground filtering by varying-scale TIN finished!\n');
