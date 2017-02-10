@@ -235,23 +235,23 @@ class DWELPointsClassifier:
         else:
             spec_header = dpu._dwel_points_ascii_scheme['skip_header']
             
-            # See if the spectral point cloud file has the column of
-            # ground_label. If so, we will replace the class label of
-            # these points with a new ground class label.
-            with open(spectral_points_file) as specfobj:
-                for i in range(spec_header):
-                    specfobj.readline()
-                colname_str = specfobj.readline().strip()
-                if colname_str.find('ground_label') > -1:
-                    ground_label = dpu.loadPoints(spectral_points_file, usecols=['ground_label'])
-                    if isinstance(pred_labels[0], basestring):
-                        ground_clsname = 'ground_from_spec'
-                    else:
-                        ground_clsname = np.max(pred_labels) + 1
-                    tmpind = np.where(ground_label!=0)[0]
-                    pred_labels[tmpind] = ground_clsname
-                    if pred_proba is not None:
-                        pred_proba[tmpind] = -1
+            # # See if the spectral point cloud file has the column of
+            # # ground_label. If so, we will replace the class label of
+            # # these points with a new ground class label.
+            # with open(spectral_points_file) as specfobj:
+            #     for i in range(spec_header):
+            #         specfobj.readline()
+            #     colname_str = specfobj.readline().strip()
+            #     if colname_str.find('ground_label') > -1:
+            #         ground_label = dpu.loadPoints(spectral_points_file, usecols=['ground_label'])
+            #         if isinstance(pred_labels[0], basestring):
+            #             ground_clsname = 'ground_from_spec'
+            #         else:
+            #             ground_clsname = np.max(pred_labels) + 1
+            #         tmpind = np.where(ground_label!=0)[0]
+            #         pred_labels[tmpind] = ground_clsname
+            #         if pred_proba is not None:
+            #             pred_proba[tmpind] = -1
             
             if msc_file is not None:
                 out_file_msc = '.'.join(out_file.split('.')[0:-1]) + '_msc.txt'
