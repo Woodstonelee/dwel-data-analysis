@@ -341,6 +341,7 @@ function ground_filter_var_tin(dwel_pts_file, out_dir, varargin)
     for i=1:nrows
         if ground_flag(i)
             fprintf(fid, '%s\n', data{1}{i});
+            fprintf(nfid, '# %s\n', data{1}{i});
         else
             fprintf(nfid, '%s\n', data{1}{i});
         end
