@@ -282,10 +282,12 @@ function ground_filter_var_tin(dwel_pts_file, out_dir, varargin)
     fprintf('Extracting/labeling ground points from/to original input DWEL point clouds\n');
 
     % files to output filtered ground points in original DWEL formats:
-    ground_dwel_pts_file = fullfile(out_dir, [fp2, '_ground', fp3]);
+    ground_dwel_pts_file = fullfile(out_dir, [fp2, '_ground', fp3]); % point cloud of ground points
+    nonground_dwel_pts_file = fullfile(out_dir, [fp2, '_nonground', fp3]); % point cloud of nonground points
     labeled_dwel_pts_file = fullfile(out_dir, [fp2, '_gf', fp3]); % point cloud with ground labels
 
     fprintf('Output of extracted ground points from DWEL point cloud: %s\n', ground_dwel_pts_file);
+    fprintf('Output of nonground points from DWEL point cloud: %s\n', nonground_dwel_pts_file);
     fprintf('Output of labeled ground points to DWEL point cloud: %s\n', labeled_dwel_pts_file);
 
     fid = fopen(fullfile(ScanPtsPathName, ScanPtsFileName));
@@ -294,23 +296,26 @@ function ground_filter_var_tin(dwel_pts_file, out_dir, varargin)
     fid = fopen(fullfile(ScanPtsPathName, ScanPtsFileName));
     data = textscan(fid, '%s', 'HeaderLines', dwel_skip_header, 'Delimiter', '\n');
     fclose(fid);
+
     fid = fopen(ground_dwel_pts_file, 'w');
-    nfid = fopen(labeled_dwel_pts_file, 'w');
+    nfid = fopen(nonground_dwel_pts_file, 'w');
+    lfid = fopen(labeled_dwel_pts_file, 'w');
     for i=1:length(header{1})
         fprintf(fid, '%s\n', header{1}{i});
+        fprintf(nfid, '%s\n', header{1}{i});
         if i==1
             if isempty(ground_extra)
-                fprintf(nfid, '%s,ground_label\n', header{1}{i});
+                fprintf(lfid, '%s,ground_label\n', header{1}{i});
             else
                 size_tmp = size(ground_extra);
                 tmpstr = '';
                 for ige=1:size_tmp(2)
                     tmpstr = [tmpstr, sprintf(',ground_extra_%d', ige)];
                 end
-                fprintf(nfid, '%s,ground_label%s\n', header{1}{i}, tmpstr);
+                fprintf(lfid, '%s,ground_label%s\n', header{1}{i}, tmpstr);
             end
         else
-            fprintf(nfid, '%s\n', header{1}{i});
+            fprintf(lfid, '%s\n', header{1}{i});
         end
     end
     ground_flag = zeros(length(data{1}), 1);
@@ -336,12 +341,14 @@ function ground_filter_var_tin(dwel_pts_file, out_dir, varargin)
     for i=1:nrows
         if ground_flag(i)
             fprintf(fid, '%s\n', data{1}{i});
+        else
+            fprintf(nfid, '%s\n', data{1}{i});
         end
 
         if isempty(ground_extra)
-            fprintf(nfid, '%s,%d\n', data{1}{i}, ground_flag(i));
+            fprintf(lfid, '%s,%d\n', data{1}{i}, ground_flag(i));
         else
-            fprintf(nfid, fmtstr, data{1}{i}, ground_flag(i), ground_extra(i, :));
+            fprintf(lfid, fmtstr, data{1}{i}, ground_flag(i), ground_extra(i, :));
         end
 
         if mod(i, progress_cnt) == 0
@@ -350,7 +357,7 @@ function ground_filter_var_tin(dwel_pts_file, out_dir, varargin)
     end
     fprintf('\n');
     fclose(fid);
-    fclose(nfid);
+    fclose(lfid);
 
     fprintf('Ground filtering by varying-scale TIN finished!\n');
 
