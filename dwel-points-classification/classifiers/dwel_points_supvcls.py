@@ -325,12 +325,6 @@ class DWELPointsClassifier:
                     for i in range(spec_header):
                         outfobj.write("{0:s}".format(specfobj.readline()))
                     outfobj.write('{0:s}\n'.format(headerstr))
-                    # specfobj.readline()
-                    # for i, line in enumerate(specfobj):
-                    #     if line.lstrip().find(dpu._dwel_points_ascii_scheme["comments"]) == 0:
-                    #         continue
-                    #     else:
-                    #         break
 
                     for n, (bi, ei) in enumerate(itertools.izip(beg_idx, end_idx)):
                         msc_data = mscfobj.read(npts=self.pf_npts)
