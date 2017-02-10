@@ -7,12 +7,12 @@ import canupo
 
 _dwel_points_ascii_scheme = {'skip_header':0, \
                              'delimiter':",", \
-                             'comments':"//", \
-                             'x':0, 'y':1, 'z':2, 'd_i_nir':3, 'd_i_swir':4, \
-                             'return_number':5, 'number_of_returns':6, 'shot_number':7, \
-                             'range':8, 'theta':9, 'phi':10, 'sample':11, 'line':12, \
-                             'd0_nir':13, 'd0_swir':14, 'qa':15, 'grd_label':19 \
-                            }
+                             'comments':"//"}
+                            #  'x':0, 'y':1, 'z':2, 'd_i_nir':3, 'd_i_swir':4, \
+                            #  'return_number':5, 'number_of_returns':6, 'shot_number':7, \
+                            #  'range':8, 'theta':9, 'phi':10, 'sample':11, 'line':12, \
+                            #  'd0_nir':13, 'd0_swir':14, 'qa':15, 'grd_label':19 \
+                            # }
 
 def loadPoints(inptsfile, usecols=['x', 'y', 'z', \
                                    'd_i_nir', 'd_i_swir', 'range']):
@@ -51,7 +51,7 @@ class MSCFile:
         Parameters: **npts**, *int*
 
         Returns: **mscdata**, *2D numpy array*
-                   (npts, nscales*2+1), *npts* is the number of points
+                   (npts, nscales*2+4), *npts* is the number of points
                    being read out, either given by the parameter
                    *npts* or all the points in the MSC file; *nscales*
                    is the number of scales being read out, either
@@ -60,9 +60,9 @@ class MSCFile:
                    *a* as the 1D component and *b* as the 2D
                    component. The first *nscales* columns are *a* and
                    the second *nscales* columns are *b*. The extra
-                   last column is the line number of each point in its
-                   original ASCII point cloud that has generated this
-                   MSC file.
+                   last four columns are: x, y, z, and the line number
+                   of each point in its original ASCII point cloud
+                   that has generated this MSC file.
         """
         mscheader = self.header
 
@@ -86,7 +86,7 @@ class MSCFile:
                 return None
 
         n_use_scales = len(use_scales)
-        mscdata = np.zeros((int(npts), int(2*n_use_scales+1)))
+        mscdata = np.zeros((int(npts), int(2*n_use_scales+4)))
 
         if start is None:
             start = self.next_pt_idx            
@@ -94,7 +94,7 @@ class MSCFile:
         tmp = self._mscfobj.read_point(npts, start)
         mscdata[:, 0:n_use_scales] = np.array(tmp[1]).reshape(npts, nscales)[:, use_scales]
         mscdata[:, n_use_scales:2*n_use_scales] = np.array(tmp[2]).reshape(npts, nscales)[:, use_scales]
-        mscdata[:, -1] = np.array(tmp[0]).reshape(npts, mscheader[-1])[:, -1]
+        mscdata[:, -4:] = np.array(tmp[0]).reshape(npts, mscheader[-1])[:, [0,1,2,-1]]
 
         self.next_pt_idx = self._mscfobj.next_pt_idx
         return mscdata

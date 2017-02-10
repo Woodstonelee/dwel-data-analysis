@@ -79,6 +79,7 @@ class DWELPointsClassifier:
         if msc_file is not None:
             mscfobj = dpu.openMSC(msc_file)
             npts = mscfobj.header[0]
+            nscales = len(mscfobj.header[1])
             if (spectral_points_file is not None) and (npts != len(spec_points)):
                 raise RuntimeError("Input spectral points file and MSC file have different number of points! Check your inputs!")
         else:
@@ -99,9 +100,9 @@ class DWELPointsClassifier:
             if msc_file is not None:
                 msc_data = mscfobj.read(npts=self.pf_npts)
                 if spectral_points_file is not None:
-                    data = np.hstack((spec_points[msc_data[:, -1].astype(int)-1, :], msc_data[:, 0:-1]))
+                    data = np.hstack((spec_points[msc_data[:, -1].astype(int)-1, :], msc_data[:, 0:2*nscales]))
                 else:
-                    data = msc_data[:, 0:-1]
+                    data = msc_data[:, 0:2*nscales]
                 data_idx = msc_data[:, -1].astype(int)-1
             else:
                 data = spec_points[bi:ei]
@@ -144,13 +145,14 @@ class DWELPointsClassifier:
                 raise RuntimeError("Number of given class labels is different from that of given MSC training files")
             msc_fobj_list = [dpu.openMSC(fname) for fname in msc_training_files]
             msc_training_list = [fobj.read() for fobj in msc_fobj_list]
+            msc_nscales_list = [len(fobj.header[1]) for fobj in msc_fobj_list]
             _ = [fobj.close() for fobj in msc_fobj_list]
 
         data_list = list()
         y_list = list()
         if (spectral_training_files is not None) and (msc_training_files is not None):
-            for spec, msc, cls in itertools.izip(spec_training_list, msc_training_list, class_labels):
-                data = np.hstack((spec[msc[:, -1].astype(int)-1, :], msc[:, 0:-1]))
+            for spec, msc, cls, ns in itertools.izip(spec_training_list, msc_training_list, class_labels, msc_nscales_list):
+                data = np.hstack((spec[msc[:, -1].astype(int)-1, :], msc[:, 0:2*ns]))
                 y = np.tile(cls, len(spec))
                 tmp_flag = np.logical_not(np.isnan(data).any(axis=1))
                 data_list.append(data[tmp_flag, :])
@@ -163,8 +165,8 @@ class DWELPointsClassifier:
                 data_list.append(data[tmp_flag, :])
                 y_list.append(y[tmp_flag])
         elif msc_training_files is not None:
-            for msc, cls in itertools.izip(msc_training_list, class_labels):
-                data = msc[:, 0:-1]
+            for msc, cls, ns in itertools.izip(msc_training_list, class_labels, msc_nscales_list):
+                data = msc[:, 0:2*ns]
                 y = np.tile(cls, len(msc))
                 tmp_flag = np.logical_not(np.isnan(data).any(axis=1))
                 data_list.append(data[tmp_flag, :])
@@ -191,21 +193,7 @@ class DWELPointsClassifier:
 
         npts = len(pred_labels)
         if spectral_points_file is None:
-            if msc_file is None:
-                if pred_proba is None:
-                    out_data = pred_labels
-                    fmtstr = '%d'
-                    headerstr = 'class'
-                else:
-                    out_data = np.hstack((np.reshape(pred_labels, (len(pred_labels), 1)), \
-                                          np.reshape(pred_proba, (len(pred_proba), 1))))
-                    fmtstr = '%d,%.3f'
-                    headerstr = 'class,proba'
-                if self.verbose:
-                    sys.stdout.write('...\n')
-                    sys.stdout.flush()
-                np.savetxt(out_file, out_data, fmt=fmtstr, delimiter=',', header=headerstr, comments='')
-            else:
+            if msc_file is not None:
                 mscfobj = dpu.openMSC(msc_file)
                 if npts != mscfobj.header[0]:
                     raise RuntimeError("Given class label and MSC file have different number of points")
@@ -216,9 +204,11 @@ class DWELPointsClassifier:
                 end_idx[0:-1] = beg_idx[1:]
                 end_idx[-1] = int(npts)                
                 if pred_proba is None:
-                    headerstr = 'class,'+','.join(['a_{0:d},b_{0:d}'.format(i+1) for i in range(nscales)])
+                    headerstr = '{0:s} x,y,z,class,'.format(dpu._dwel_points_ascii_scheme['comments']) \
+                                + ','.join(['a_{0:d},b_{0:d}'.format(i+1) for i in range(nscales)])
                 else:
-                    headerstr = 'class,proba,'+','.join(['a_{0:d},b_{0:d}'.format(i+1) for i in range(nscales)])
+                    headerstr = '{0:s} x,y,z,class,proba,'.format(dpu._dwel_points_ascii_scheme['comments']) \
+                                + ','.join(['a_{0:d},b_{0:d}'.format(i+1) for i in range(nscales)])
                 with open(out_file, 'w') as outfobj:
                     if self.verbose:
                         sys.stdout.write('\n\tpercent ...')
@@ -228,9 +218,9 @@ class DWELPointsClassifier:
                         msc_data = mscfobj.read(npts=self.pf_npts)
                         for i in range(ei-bi):
                             if pred_proba is None:
-                                outfobj.write('{0:d},'.format(pred_labels[msc_data[i, -1].astype(int)-1]))
+                                outfobj.write('{1[0]:.3f},{1[1]:.3f},{1[2]:.3f},{0:d},'.format(pred_labels[msc_data[i, -1].astype(int)-1]), msc_data[i, -4:-1])
                             else:
-                                outfobj.write('{0:d},{1:.3f},'.format(pred_labels[msc_data[i, -1].astype(int)-1], pred_proba[msc_data[i, -1].astype(int)-1]))
+                                outfobj.write('{1[0]:.3f},{1[1]:.3f},{1[2]:.3f},{0:d},{2:.3f},'.format(pred_labels[msc_data[i, -1].astype(int)-1], msc_data[i, -4:-1], pred_proba[msc_data[i, -1].astype(int)-1]))
                             for s in range(nscales-1):
                                 outfobj.write('{0:.3f},{1:.3f},'.format(msc_data[i, s], msc_data[i, s+nscales]))
                                 outfobj.write('{0:.3f},{1:.3f}\n'.format(msc_data[i, s+1], msc_data[i, s+1+nscales]))
@@ -244,13 +234,34 @@ class DWELPointsClassifier:
                 mscfobj.close()
         else:
             spec_header = dpu._dwel_points_ascii_scheme['skip_header']
+            
+            # See if the spectral point cloud file has the column of
+            # ground_label. If so, we will replace the class label of
+            # these points with a new ground class label.
+            with open(spectral_points_file) as specfobj:
+                for i in range(spec_header):
+                    specfobj.readline()
+                colname_str = specfobj.readline().strip()
+                if colname_str.find('ground_label') > -1:
+                    ground_label = dpu.loadPoints(spectral_points_file, usecols=['ground_label'])
+                    if isinstance(pred_labels[0], basestring):
+                        ground_clsname = 'ground_from_spec'
+                    else:
+                        ground_clsname = np.max(pred_labels) + 1
+                    tmpind = np.where(ground_label!=0)[0]
+                    pred_labels[tmpind] = ground_clsname
+                    if pred_proba is not None:
+                        pred_proba[tmpind] = -1
+            
             if msc_file is not None:
                 out_file_msc = '.'.join(out_file.split('.')[0:-1]) + '_msc.txt'
                 out_file_spec = '.'.join(out_file.split('.')[0:-1]) + '_spectral.txt'
                 print ""
-                print "Classification result will be written twice in two files with one attaching spectral attributes and the other spatial attibutes:"
+                print "Classification result will be written twice in two files with one attaching spectral attributes and the other spatial attibutes."
             else:
-                out_file_spec = out_file
+                out_file_spec = '.'.join(out_file.split('.')[0:-1]) + '_spectral.txt'
+                print ""
+                print "Classification result will be written in one file attaching spectral attributes."
             
             with open(spectral_points_file) as specfobj, open(out_file_spec, 'w') as outfobj:
                 print "Attaching class with spectral attributes to: "
@@ -280,7 +291,7 @@ class DWELPointsClassifier:
                     sys.stdout.flush()
 
             if msc_file is not None:
-                points = dpu.loadPoints(spectral_points_file, usecols=['x', 'y', 'z'])
+                # points = dpu.loadPoints(spectral_points_file, usecols=['x', 'y', 'z'])
 
                 mscfobj = dpu.openMSC(msc_file)
                 if npts != mscfobj.header[0]:
@@ -294,14 +305,14 @@ class DWELPointsClassifier:
                 if pred_proba is None:
                     headerstr = '{0:s} x,y,z,class,'.format(dpu._dwel_points_ascii_scheme['comments']) \
                                 +','.join(['a_{0:d},b_{0:d}'.format(i+1) for i in range(nscales)])
-                    fmtstr = ','.join(['{{0[{0:d}]:.6f}}'.format(i) for i in range(3)]) + ',' \
+                    fmtstr = ','.join(['{{0[{0:d}]:.3f}}'.format(i) for i in range(3)]) + ',' \
                              + '{1:d},' \
                              + ','.join(['{{2[{0:d}]:.3f}},{{2[{1:d}]:.3f}}'.format(i, i+nscales) for i in range(nscales)]) \
                              + '\n'
                 else:
                     headerstr = '{0:s} x,y,z,class,proba,'.format(dpu._dwel_points_ascii_scheme['comments']) \
                                 +','.join(['a_{0:d},b_{0:d}'.format(i+1) for i in range(nscales)])
-                    fmtstr = ','.join(['{{0[{0:d}]:.6f}}'.format(i) for i in range(3)]) + ',' \
+                    fmtstr = ','.join(['{{0[{0:d}]:.3f}}'.format(i) for i in range(3)]) + ',' \
                              + '{1:d},{2:.3f},' \
                              + ','.join(['{{3[{0:d}]:.3f}},{{3[{1:d}]:.3f}}'.format(i, i+nscales) for i in range(nscales)]) \
                              + '\n'
@@ -326,9 +337,11 @@ class DWELPointsClassifier:
                         msc_idx = msc_data[:, -1].astype(int)-1
                         for i in range(ei-bi):
                             if pred_proba is None:
-                                outfobj.write(fmtstr.format(points[msc_idx[i], :], pred_labels[msc_idx[i]], msc_data[i,:]))
+                                # outfobj.write(fmtstr.format(points[msc_idx[i], :], pred_labels[msc_idx[i]], msc_data[i,:]))
+                                outfobj.write(fmtstr.format(msc_data[i, -4:-1], pred_labels[msc_idx[i]], msc_data[i,:]))
                             else:
-                                outfobj.write(fmtstr.format(points[msc_idx[i], :], pred_labels[msc_idx[i]], pred_proba[msc_idx[i]], msc_data[i,:]))
+                                # outfobj.write(fmtstr.format(points[msc_idx[i], :], pred_labels[msc_idx[i]], pred_proba[msc_idx[i]], msc_data[i,:]))
+                                outfobj.write(fmtstr.format(msc_data[i, -4:-1], pred_labels[msc_idx[i]], pred_proba[msc_idx[i]], msc_data[i,:]))
                         if self.verbose and (n*self.pf_npts+ei-bi > npts*0.1*progress_cnt):
                             sys.stdout.write('{0:d}...'.format(int((n*self.pf_npts+ei-bi)/float(npts)*100)))
                             sys.stdout.flush()
