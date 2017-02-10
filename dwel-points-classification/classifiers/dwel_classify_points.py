@@ -29,6 +29,8 @@ def getCmdArgs():
     p.add_argument('--train_spatial', dest='train_spa', nargs='+', default=None, help='List of MSC files for training Random Forest classifier, with each file for one class.')
 
     p.add_argument("-M", "--multiout", dest="multiout", default=False, action="store_true", help="Output classification into mulitiple files, one file for one class for easy display in CloudCompare. Default: false")
+
+    p.add_argument("--use_msc_scales", dest="use_msc_scales", type=int, nargs="+", default=None, help="Indices of MSC scales to use in the classification, with first scale being indexed 1. Use \"msc_tool info file.msc\" to check the list of scales in the MSC file.")
     
     p.add_argument("-v", "--verbose", dest='verbose', default=False, action='store_true', help='Turn on verbose. Default: false')
 
@@ -81,7 +83,7 @@ def main(cmdargs):
     verbose = cmdargs.verbose
     mscfile = cmdargs.mscfile
     multiout = cmdargs.multiout
-
+    use_msc_scales = cmdargs.use_msc_scales
 
     print "Start {0:s}".format(classifier)
     
@@ -106,22 +108,31 @@ def main(cmdargs):
                                                       msc_file=mscfile, \
                                                       spectral_training_files=cmdargs.train_spec,
                                                       msc_training_files=cmdargs.train_spa, \
+                                                      use_msc_scales=use_msc_scales, \
                                                       n_estimators=100, n_jobs=-1)
-        dpc.writeClassification(outfile, pred_labels, pred_proba=pred_proba, spectral_points_file=infile, msc_file=mscfile)
+        dpc.writeClassification(outfile, pred_labels, pred_proba=pred_proba, \
+                                spectral_points_file=infile, msc_file=mscfile, \
+                                use_msc_scales=use_msc_scales)
 
     if classifier == 'Spectral-RF':
         dpc = DWELPointsClassifier(verbose)
         pred_labels, pred_proba = dpc.runRandomForest(spectral_points_file=infile, \
-                                                      spectral_training_files=cmdargs.train_spec,
+                                                      spectral_training_files=cmdargs.train_spec, \
+                                                      use_msc_scales=use_msc_scales, \
                                                       n_estimators=100, n_jobs=-1)
-        dpc.writeClassification(outfile, pred_labels, pred_proba=pred_proba, spectral_points_file=infile)
+        dpc.writeClassification(outfile, pred_labels, pred_proba=pred_proba, \
+                                spectral_points_file=infile, \
+                                use_msc_scales=use_msc_scales)
         
     if classifier == 'Spatial-RF':
         dpc = DWELPointsClassifier(verbose)
         pred_labels, pred_proba = dpc.runRandomForest(msc_file=mscfile, \
                                                       msc_training_files=cmdargs.train_spa, \
+                                                      use_msc_scales=use_msc_scales, \
                                                       n_estimators=100, n_jobs=-1)
-        dpc.writeClassification(outfile, pred_labels, pred_proba=pred_proba, msc_file=mscfile, spectral_points_file=infile)
+        dpc.writeClassification(outfile, pred_labels, pred_proba=pred_proba, \
+                                msc_file=mscfile, spectral_points_file=infile, \
+                                use_msc_scales=use_msc_scales)
 
         
 if __name__ == "__main__":
