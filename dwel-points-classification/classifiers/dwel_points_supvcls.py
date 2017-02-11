@@ -60,7 +60,7 @@ class DWELPointsClassifier:
             use_msc_scales = np.array(use_msc_scales).astype(int) - 1
             mscdata_idx = np.append(use_msc_scales, use_msc_scales+nscales)
 
-            if nfeatures != 3+len(mscdata_idx):
+            if nfeatures != f_idx+len(mscdata_idx):
                 raise RuntimeError("Number of features in the training data is not consistent with the expected. Training data may not be read correctly.")
 
             for i, ums in enumerate(use_msc_scales):
