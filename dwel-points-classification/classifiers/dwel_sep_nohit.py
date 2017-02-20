@@ -49,8 +49,8 @@ def getCmdArgs():
     p.add_argument("-i", "--infile", dest="infile", required=True, default=None, help="Input original DWEL point cloud")
     p.add_argument("-o", "--outdir", dest="outdir", required=False, default=None, help="Output directory")
 
-    p.add_argument("--skip_header", dest="skip_header", required=False, default=3, help="The number of lines to skip at the beginning of the file. Default: 3")
-    p.add_argument("--col_num_ret", dest="col_num_ret", required=False, default=7, help="Column index of the number of returns, with the first column as 1. Default: 7")
+    p.add_argument("--skip_header", dest="skip_header", required=False, type=int, default=3, help="The number of lines to skip at the beginning of the file. Default: 3")
+    p.add_argument("--col_num_ret", dest="col_num_ret", required=False, type=int, default=7, help="Column index of the number of returns, with the first column as 1. Default: 7")
     
     p.add_argument("-v", "--verbose", dest="verbose", action="store_true", default=False, help="Turn on verbose. Default: false")
 
