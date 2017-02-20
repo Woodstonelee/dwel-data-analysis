@@ -130,7 +130,7 @@ def dwel_points2hsproj2(infile, outfile, \
                            outres=2.0, \
                            minzen=0.0, maxzen=91.0, \
                            pulsemax=True, \
-                            camheight=0.0):
+                           camheight=0.0):
     """
     A second version of projecting points to hemispherical images.The coverage
     of pixels in hemi-image overlap each other a bit to reduce holes in the
@@ -598,7 +598,7 @@ def dwel_points2hsproj(infile, outfile, \
         "sensor type = Unknown\n" + \
         "byte order = 0\n" + \
         "wavelength units = unknown\n" + \
-        "band names = {DWEL points " + os.path.basename(outfile)+ ", mask, num_inpts, num_outpts}"
+        "band names = {pts_proj, mask, num_inpts, num_outpts}"
     with open(hdrfile, 'w') as hdrf:
         hdrf.write(hdrstr)
 

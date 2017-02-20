@@ -1,7 +1,10 @@
 #!/usr/bin/env python
-"""
-Accuracy assessment of DWEL point cloud classification from comparison of
-hemiphotos and hemi-projection of point cloud.
+"""Accuracy assessment of DWEL point cloud classification of two
+classes (leaf vs wood) by comparing hemiphotos and hemi-projection of
+point cloud. This accuracy assessment from hemi-pixels to points uses
+an enumaration of all possible point labels that gives us the
+hemi-pixel labels. It ONLY works for two-class classification scheme
+for now.
 
 USAGE:
 
@@ -12,6 +15,7 @@ EXAMPLES:
 AUTHORS:
 
     Zhan Li, zhanli86@bu.edu
+
 """
 
 import sys
@@ -30,62 +34,66 @@ import pandas as pd
 def getCmdArgs():
     p = argparse.ArgumentParser(description="Accuracy assessment of DWEL point cloud classification")
 
-    # p.add_argument("--csv", dest="csv", nargs='+', default=("/projectnb/echidna/lidar/DWEL_Processing/HF2014/Hardwood20140503/hfhd20140503-points-classification-accuracy-assessment/hsproj-random-samples/HFHD_20140503_C_dual_cube_bsfix_pxc_update_atp2_ptcl_points_hsp2_random_samples_validation.csv", "/projectnb/echidna/lidar/DWEL_Processing/HF2014/Hardwood20140503/hfhd20140503-points-classification-accuracy-assessment/hsproj-random-samples/HFHD_20140503_E_dual_cube_bsfix_pxc_update_atp2_ptcl_points_hsp2_random_samples_validation.csv"), help="CSV files of 'ground truth' data from hemiphotos and visual interpretation")
-    # p.add_argument("--img", dest="img", nargs='+', default=("/projectnb/echidna/lidar/DWEL_Processing/HF2014/Hardwood20140503/spectral-points-by-union/HFHD20140503-dual-points-clustering/merging/HFHD_20140503_C_dual_cube_bsfix_pxc_update_atp2_ptcl_points_kmeans_canupo_class_hsp2_extrainfo.img", "/projectnb/echidna/lidar/DWEL_Processing/HF2014/Hardwood20140503/spectral-points-by-union/HFHD20140503-dual-points-clustering/merging/HFHD_20140503_E_dual_cube_bsfix_pxc_update_atp2_ptcl_points_kmeans_canupo_class_hsp2_extrainfo.img"), help="ENVI image files of extra information for accuracy assessment, e.g. number of points per projection bin in the hemispherical image")
-    # p.add_argument("-o", "--outfile", dest="outfile", default="/projectnb/echidna/lidar/DWEL_Processing/HF2014/Hardwood20140503/hfhd20140503-points-classification-accuracy-assessment/error-matrices/HFHD_20140503_C_dual_cube_bsfix_pxc_update_atp2_ptcl_points_hsp2_random_samples_validation_errmat.txt", help="Output file of accuracy assessment summary")
+    p.add_argument("--csv", dest="csv", nargs='+', required=True, default=None, help="CSV files of 'ground truth' data, with the columns in order from the first to last: pixel_X(image sample/column), pixel_Y(image line/row), pixel_value(can be empty), primary_truth_label,secondary_truth_label, truth_label_confidence(optional).")
+    p.add_argument("--cls", dest="cls", nargs="+", required=True, default=None, help="ENVI image files of the projections of DWEL point cloud classification.")
+    p.add_argument("--img", dest="img", nargs='+', required=False, default=None, help="ENVI image files of extra information for accuracy assessment, providing number of points both included and excluded per pixel/projection bin in the projection images. When this extra informatinon is provided, pixel-based accuracy assessment over projection images will be converted to point-based assessment by enumerating all possible point labels per pixel that gives the projection pixel label. It ONLY works for two-class classification scheme for now.")
+    p.add_argument("-o", "--outfile", dest="outfile", required=True, default=None, help="Output file of accuracy assessment summary.")
 
-    p.add_argument("--csv", dest="csv", nargs='+', default=None, help="CSV files of 'ground truth' data from hemiphotos and visual interpretation")
-    p.add_argument("--img", dest="img", nargs='+', default=None, help="ENVI image files of extra information for accuracy assessment, e.g. number of points per projection bin in the hemispherical image")
-    p.add_argument("-o", "--outfile", dest="outfile", default=None, help="Output file of accuracy assessment summary")
+    p.add_argument("--inptsB", dest="inptsB", type=int, default=3, help="In the ENVI image file, the band index of the number of points included in generation of pixel values of projection images from DWEL point cloud, with first band being 1. Default: 3.")
+    p.add_argument("--outptsB", dest="outptsB", type=int, default=4, help="In the ENVI image file, the band index of the number of points NOT included in generation of pixel values of projection images from DWEL point cloud, with first band being 1. Default: 4.")
 
-    p.add_argument("--inptsB", dest="inptsB", type=int, default=3, help="In the ENVI image file, the band index of the number of points included in generation of pixel values of hemispherical projection from DWEL point cloud, with first band being 1. Default: 3")
-    p.add_argument("--outptsB", dest="outptsB", type=int, default=4, help="In the ENVI image file, the band index of the number of points NOT included in generation of pixel values of hemispherical projection from DWEL point cloud, with first band being 1. Default: 4")
-
-    p.add_argument("--zerozen", dest='zerozen', type=int, nargs=2, metavar=('zerozen_row', 'zerozen_col'), default=(1022, 1022), help='Location of zero zenith in the hemispherical image')
-    p.add_argument("--inres", dest="inres", type=float, default=2.0, help="Resolution of input hemispherical image. Unit: mrad. Default: 2.0 mrad")
+    p.add_argument("--zerozen", dest='zerozen', type=int, nargs=2, metavar=('zerozen_row', 'zerozen_col'), default=(1022, 1022), help='Location of zero zenith in the projection images. Default: (1022, 1022)')
+    p.add_argument("--inres", dest="inres", type=float, default=2.0, help="Resolution of input projection images. Unit: mrad. Default: 2.0 mrad.")
 
     cmdargs = p.parse_args()
 
-    if (cmdargs.csv is None) or (cmdargs.outfile is None):
+    nfiles = len(cmdargs.csv)
+    if nfiles != len(cmdargs.cls):
         p.print_help()
-        print "Both csv of 'ground truth' and output file names must be given."
-        sys.exit()
+        msgstr = "Number of CSV files of ground truth must be the same as the number of ENVI image files of the projection DWEL point cloud classification."
+        raise RuntimeError(msgstr)
+    if cmdargs.img is not None:
+        if len(cmdargs.img) != nfiles:
+            p.print_help()
+            raise RuntimeError("Number of CSV files of ground truth must be the same as the number of ENVI image files of extra information if you give the ENVI image files of extra information.")
 
     return cmdargs
 
 def main(cmdargs):
     csvfiles = cmdargs.csv
+    clsfiles = cmdargs.cls
     imgfiles = cmdargs.img
     outfile = cmdargs.outfile
-    inresolution = cmdargs.inres*1e-3
 
+    inptsB = cmdargs.inptsB
+    outptsB = cmdargs.outptsB
+
+    inresolution = cmdargs.inres*1e-3
     zerozen = cmdargs.zerozen
 
-    inptsB = None
-    outptsB = None
-    nfiles = len(csvfiles)
-    if imgfiles is not None:
-        if len(imgfiles) != nfiles:
-            raise RuntimeError("Number of CSV files of ground truth must be the same as the number of ENVI image files of extra information if you give the ENVI image files")
-        inptsB = cmdargs.inptsB
-        outptsB = cmdargs.outptsB
-
     # read CSV file
-    groundtruth_list = [ np.loadtxt(csv, delimiter=',', skiprows=1) for csv in csvfiles ]
-#    groundtruth = np.loadtxt(csvfile, delimiter=',', skiprows=1)
-    # error matrix by number of pixels
-    class_label_list = [ gt[:, 2] for gt in groundtruth_list ]
-    primary_label_list = [ gt[:, 3] for gt in groundtruth_list ]
-    secondary_label_list = [ gt[:, 4] for gt in groundtruth_list ]
-    # class_label = groundtruth[:, 2]
-    # primary_label = groundtruth[:, 3]
-    # secondary_label = groundtruth[:, 4]
+    groundtruth_list = [ np.genfromtxt(csv, delimiter=',', skip_header=1) for csv in csvfiles ]
 
+    # Somehow the Y/row/line of ground truth sample pixels are in
+    # negative values in my current data. The input data in future
+    # needs be fixed and the code here be fixed as well!
     pixel_row_list = [ (gt[:, 1] + 0.5)*-1 for gt in groundtruth_list ]
     pixel_col_list = [ gt[:, 0] - 0.5 for gt in groundtruth_list ]
 
+    # error matrix by number of pixels
+    # class_label_list = [ gt[:, 2] for gt in groundtruth_list ]
+    class_label_list = [ getClassCode(clsf, prow, pcol) for clsf, prow, pcol in itertools.izip(clsfiles, pixel_row_list, pixel_col_list)]
+    primary_label_list = [ gt[:, 3] for gt in groundtruth_list ]
+    secondary_label_list = [ gt[:, 4] for gt in groundtruth_list ]
+
     pixel_zen = np.sqrt((np.hstack(pixel_row_list)-zerozen[0])**2+(np.hstack(pixel_col_list)-zerozen[1])**2)*inresolution
-    weights = np.sin(pixel_zen)
+    # Because larger zenith angles have more pixels in the
+    # hemi-projection, hence larger probability to have more samples
+    # from these larger zenith angles, and thus the weight needs to be
+    # the inverse of zenith angles to account for the zenith ring areas
+    # for pixels in the hemi-projection.
+    pixel_zen[np.abs(pixel_zen)<1e-10] = inresolution / (2*np.pi)
+    weights = 1./pixel_zen
 
     primary_errmat_pixel_counts = calcErrorMatrix( \
         np.hstack(class_label_list).astype(np.int), \
@@ -114,26 +122,35 @@ def main(cmdargs):
         class_npts_list, nonclass_npts_list = zip(*npts_list)
         primary_errmat_point_counts = \
             estErrorMatrix_Pixel2Points(np.hstack(class_label_list).astype(np.int), \
-                                            np.hstack(primary_label_list).astype(np.int), \
-                                            np.hstack(class_npts_list).astype(np.int), \
-                                            np.hstack(nonclass_npts_list).astype(np.int))
+                                        np.hstack(primary_label_list).astype(np.int), \
+                                        np.hstack(class_npts_list).astype(np.int), \
+                                        np.hstack(nonclass_npts_list).astype(np.int), \
+                                        pixel_weights=weights)
 
         secondary_errmat_point_counts = \
             estErrorMatrix_Pixel2Points(np.hstack(class_label_list).astype(np.int), \
-                                            np.hstack(secondary_label_list).astype(np.int), \
-                                            np.hstack(class_npts_list).astype(np.int), \
-                                            np.hstack(nonclass_npts_list).astype(np.int))
+                                        np.hstack(secondary_label_list).astype(np.int), \
+                                        np.hstack(class_npts_list).astype(np.int), \
+                                        np.hstack(nonclass_npts_list).astype(np.int), \
+                                        pixel_weights=weights)
 
         mean_errmat_point_counts = (primary_errmat_point_counts + secondary_errmat_point_counts)*0.5
 
-        tmp = [ getTotalNumPts(imgf, classcode, countpixel=True, inptsB=inptsB, outptsB=outptsB) for imgf in imgfiles ]
-        total_npts_list, npixel_list = zip(*tmp)
+        tmp = [ getTotalNumPts(clsf, imgf, classcode, inptsB=inptsB, outptsB=outptsB, \
+                               pixelcount=True, pixelarea=True, zerozen=zerozen, pixelres=inresolution) \
+                for clsf, imgf in itertools.izip(clsfiles, imgfiles) ]
+        total_npts_list, npixel_list, pixelarea_list = zip(*tmp)
         total_npts = np.sum(np.array(total_npts_list), axis=0)
         total_npixel = np.sum(np.array(npixel_list), axis=0).astype(np.float)
+        total_pixelarea = np.sum(np.array(pixelarea_list), axis=0)
 
         primary_errmat_pixel_counts = ErrorMatrixSummary(primary_errmat_pixel_counts, total_npixel)
         secondary_errmat_pixel_counts = ErrorMatrixSummary(secondary_errmat_pixel_counts, total_npixel)
         mean_errmat_pixel_counts = ErrorMatrixSummary(mean_errmat_pixel_counts, total_npixel)
+
+        primary_errmat_pixel_area = ErrorMatrixSummary(primary_errmat_pixel_area, total_pixelarea)
+        secondary_errmat_pixel_area = ErrorMatrixSummary(secondary_errmat_pixel_area, total_pixelarea)
+        mean_errmat_pixel_area = ErrorMatrixSummary(mean_errmat_pixel_area, total_pixelarea) 
 
         primary_errmat_point_counts = ErrorMatrixSummary(primary_errmat_point_counts, total_npts)
         secondary_errmat_point_counts = ErrorMatrixSummary(secondary_errmat_point_counts, total_npts)
@@ -142,15 +159,39 @@ def main(cmdargs):
     with open(outfile, 'w') as outfobj:
         outfobj.write("Report on Classification Accuracy Assessment of DWEL point cloud\n")
         outfobj.write("Run made at: "+time.strftime("%c")+"\n")
+        outfobj.write("\n")
+        outfobj.write("# Inputs for this assessment\n")
+        outfobj.write("============================\n")
+        outfobj.write("\n")
+        outfobj.write("## CSV files of grouth truth data\n")
+        outfobj.write("\n".join(csvfiles))
+        outfobj.write("\n")
+        outfobj.write("\n")
+        outfobj.write("## Projection images of point cloud classifications\n")
+        outfobj.write("\n".join(clsfiles))
+        outfobj.write("\n")
+        outfobj.write("\n")
         if imgfiles is not None:
+            outfobj.write("## Extra information images for projection images of classifications\n")
+            outfobj.write("\n".join(imgfiles))
             outfobj.write("\n")
-            outfobj.write("# Number of pixels in mapped classes\n")
+            outfobj.write("\n")
+            outfobj.write("# Distribution of classes\n")
+            outfobj.write("=========================\n")
+            outfobj.write("\n")
+            outfobj.write("## Number of pixels in mapped classes\n")
             outfobj.write(",".join([ "{0:d}".format(n) for n in range(len(total_npixel)) ]))
             outfobj.write("\n")
             outfobj.write(",".join([ "{0:d}".format(int(n)) for n in total_npixel ]))
             outfobj.write("\n")
             outfobj.write("\n")
-            outfobj.write("# Number of points in mapped classes\n")
+            outfobj.write("## Number of pixels corrected for projection area of zenith rings in mapped classes\n")
+            outfobj.write(",".join([ "{0:d}".format(n) for n in range(len(total_pixelarea)) ]))
+            outfobj.write("\n")
+            outfobj.write(",".join([ "{0:d}".format(int(n)) for n in total_pixelarea ]))
+            outfobj.write("\n")
+            outfobj.write("\n")
+            outfobj.write("## Number of points in mapped classes\n")
             outfobj.write(",".join([ "{0:d}".format(n) for n in range(len(total_npts)) ]))
             outfobj.write("\n")
             outfobj.write(",".join([ "{0:d}".format(int(n)) for n in total_npts ]))
@@ -163,7 +204,7 @@ def main(cmdargs):
         outfobj.write("## pixel counts\n")
         primary_errmat_pixel_counts.to_csv(outfobj, mode="a", float_format="%.3f")
         outfobj.write("\n")
-        outfobj.write("## pixel area\n")
+        outfobj.write("## pixel counts corrected for projection area of zenith rings\n")
         primary_errmat_pixel_area.to_csv(outfobj, mode="a", float_format="%.3f")
         outfobj.write("\n")
         if imgfiles is not None:
@@ -177,7 +218,7 @@ def main(cmdargs):
         outfobj.write("## pixel counts\n")
         secondary_errmat_pixel_counts.to_csv(outfobj, mode="a", float_format="%.3f")
         outfobj.write("\n")
-        outfobj.write("## pixel area\n")
+        outfobj.write("## pixel counts corrected for projection area of zenith rings\n")
         secondary_errmat_pixel_area.to_csv(outfobj, mode="a", float_format="%.3f")
         outfobj.write("\n")
         if imgfiles is not None:
@@ -191,7 +232,7 @@ def main(cmdargs):
         outfobj.write("## pixel counts\n")
         mean_errmat_pixel_counts.to_csv(outfobj, mode="a", float_format="%.3f")
         outfobj.write("\n")
-        outfobj.write("## pixel area\n")
+        outfobj.write("## pixel counts corrected for projection area of zenith rings\n")
         mean_errmat_pixel_area.to_csv(outfobj, mode="a", float_format="%.3f")
         outfobj.write("\n")
         if imgfiles is not None:
@@ -253,14 +294,19 @@ def ErrorMatrixSummary(errmat, Ni):
     errmat_summary.loc['S(Pj)', 'S(Ui)'] = np.sqrt(VO)
     return errmat_summary
 
-def getTotalNumPts(imgfile, classcode, countpixel=False, classB=1, maskB=2, inptsB=3, outptsB=4):
+def getTotalNumPts(clsfile, imgfile, classcode, maskB=2, inptsB=3, outptsB=4, \
+                   pixelcount=False, pixelarea=False, zerozen=None, pixelres=None):
     """
     ONLY works for TWO-class scenario
 
-    countpixel (boolean): if return counts of pixels for each class
+    pixelcount (boolean): if return counts of pixels for each class
+    pixelarea (boolean): if return areas of pixels according to the solid angle coverage
+    zerozen (two-element sequence): pixel location of zero zenith angle, [row, col]
+    pixeres (float): angular resolution of pixel, unit: radian.
     """
     imgds = gdal.Open(imgfile, gdal.GA_ReadOnly)
-    classband = imgds.GetRasterBand(classB)
+    clsds = gdal.Open(clsfile, gdal.GA_ReadOnly)
+    classband = clsds.GetRasterBand(1)
     maskband = imgds.GetRasterBand(maskB)
     inptsband = imgds.GetRasterBand(inptsB)
     outptsband = imgds.GetRasterBand(outptsB)
@@ -274,15 +320,28 @@ def getTotalNumPts(imgfile, classcode, countpixel=False, classB=1, maskB=2, inpt
     selectclass = classimg[maskimg]
     selectinpts = inptsimg[maskimg]
     selectoutpts = outptsimg[maskimg]
-#    classcode = np.unique(selectclass)
     inpts_total = np.array([ np.sum(selectinpts[selectclass==cls]) for cls in classcode ])
     outpts_total = np.array([ np.sum(selectoutpts[selectclass==cls]) for cls in classcode ])
 
-    if countpixel:
+    out_tuple = (inpts_total + outpts_total[::-1],)
+    if pixelcount:
         pixel_count = np.array([ np.sum(selectclass==cls) for cls in classcode ])
+        out_tuple = out_tuple + (pixel_count,)
+
+    if pixelarea:
+        if zerozen is None or pixelres is None:
+            msgstr = "getTotalNumPts: keyword arguments zerozen and pixelres are required if pixelarea is set True to calculate pixel areas according to the solid angle by weighting sin(zenith_angle)"
+            raise RuntimeError(msgstr)
+        clsrows, clscols = np.where(maskimg)
+        clszen = np.sqrt((clsrows-zerozen[0])**2+(clscols-zerozen[1])**2)*pixelres
+        clszen[np.abs(clszen)<1e-10] = pixelres/(2.*np.pi)
+        clsweights = 1./clszen
+        pixel_area = np.array([np.sum(clsweights[selectclass==cls]) for cls in classcode])
+        out_tuple = out_tuple + (pixel_area,)
 
     imgds = None
-    return inpts_total + outpts_total[::-1], pixel_count
+    clsds = None
+    return  out_tuple
 
 
 def getSampleNumPts(imgfile, pixel_row, pixel_col, inptsB=3, outptsB=4):
@@ -300,6 +359,17 @@ def getSampleNumPts(imgfile, pixel_row, pixel_col, inptsB=3, outptsB=4):
     imgds = None
 
     return class_npts, nonclass_npts
+
+def getClassCode(clsimg, pixel_row, pixel_col, clsB=1):
+    pixel_row = pixel_row.astype(np.int)
+    pixel_col = pixel_col.astype(np.int)
+    imgds = gdal.Open(clsimg, gdal.GA_ReadOnly)
+    clsband = imgds.GetRasterBand(clsB)
+    clsdata = clsband.ReadAsArray(0, 0, clsband.XSize, clsband.YSize)    
+    clscode = clsdata[pixel_row, pixel_col]
+    imgds = None
+
+    return clscode
 
 def calcErrorMatrix(class_label, truth_label, weights=None):
     """
@@ -326,7 +396,7 @@ def calcErrorMatrix(class_label, truth_label, weights=None):
 
     return errmat
 
-def estErrorMatrix_Pixel2Points(class_label, truth_label, class_npts, nonclass_npts):
+def estErrorMatrix_Pixel2Points(class_label, truth_label, class_npts, nonclass_npts, pixel_weights=None):
     """
     Estimate error matrices in terms of number of points for best and worst
     possible scenarios based on classification and ground truth labels of
@@ -349,7 +419,9 @@ def estErrorMatrix_Pixel2Points(class_label, truth_label, class_npts, nonclass_n
     class_code = np.union1d(tmpclass, tmptruth)
     nclass = len(class_code)
     errmat = pd.DataFrame(data=np.zeros((nclass, nclass)), index=class_code, columns=class_code)
-    weights = class_npts + nonclass_npts
+    if pixel_weights is None:
+        pixel_weights = np.ones_like(class_label)
+    weights = (class_npts + nonclass_npts) * pixel_weights
     npts_class = np.zeros(2)
     for i, (c, t, cn, ncn) in enumerate(itertools.izip(class_label, truth_label, class_npts, nonclass_npts)):
         tmpind = np.where(class_code == c)[0]
@@ -428,5 +500,4 @@ def enumeratePtsErrorMatrices(npts_class, npts_truth):
 
 if __name__=="__main__":
     cmdargs = getCmdArgs()
-#    estPtsErrorMatrix(np.array([9, 2]), 0)
     main(cmdargs)
