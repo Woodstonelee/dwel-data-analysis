@@ -9,6 +9,7 @@ Created: Tue Oct 25 22:14:25 EDT 2016
 import sys
 import argparse
 import itertools
+import warnings
 
 import numpy as np
 
@@ -23,23 +24,28 @@ def stackPtsFiles(infiles, outfile, \
     delimiter = dpu._dwel_points_ascii_scheme["delimiter"]
 
     inpts_list = [dpu.loadPoints(fname, usecols=["range", "sample", "line", "return_number", "number_of_returns", "shot_number"]) for fname in infiles]
-    fidx = np.vstack([np.zeros((len(pts), 1))+i for i, pts in enumerate(inpts_list)]).astype(int)
-    lidx = np.vstack([np.reshape(np.arange(len(pts)), (len(pts), 1)) for i, pts in enumerate(inpts_list)]).astype(int)
+    fidx = np.vstack([np.zeros((len(pts), 1))+i for i, pts in enumerate(inpts_list) if len(pts)>0]).astype(int)
+    lidx = np.vstack([np.reshape(np.arange(len(pts)), (len(pts), 1)) for i, pts in enumerate(inpts_list) if len(pts)>0]).astype(int)
 
     print "Sorting points according to shot locations and ranges ..."
-    sortind, num_of_returns, return_num, shot_num = sortPoints(np.vstack([pts[:, 0:3] for pts in inpts_list]), nrows=nrows, ncols=ncols)
+    sortind, num_of_returns, return_num, shot_num = sortPoints(np.vstack([pts[:, 0:3] for pts in inpts_list if len(pts)>0]), nrows=nrows, ncols=ncols)
     # Data sanity check
-    tmp = np.vstack([pts[:, 3:6] for pts in inpts_list])
+    tmp = np.vstack([pts[:, 3:6] for pts in inpts_list if len(pts)>0])
+    update_col = False
     if (np.abs(np.sum(tmp[sortind, 0]-return_num)) > 1e-10) \
        or (np.abs(np.sum(tmp[sortind, 1]-num_of_returns)) > 1e-10) \
        or (np.abs(np.sum(tmp[sortind, 2]-shot_num)) > 1e-10):
-        msgstr = "Inconsistent indices of return_number, number_of_returns and shot_number\n" \
+        msgstr = "Inconsistent indices of return_number, number_of_returns or shot_number\n" \
                  + "after stacking and sorting points from input files given the nrows and ncols.\n" \
+                 + "Will update the return_num, number_of_returns and shot_number based on range, sample and line." \
                  + "Check possible causes:\n" \
                  + "1. Wrong nrows or ncols.\n" \
                  + "2. Duplicate records of points between input files.\n" \
-                 + "3. Input files have wrong indices of return_number, number_of_returns and shot_number."
-        raise RuntimeError(msgstr)
+                 + "3. Input files have wrong indices of return_number, number_of_returns or shot_number."
+        warnings.warn(msgstr)
+        update_col = True
+        
+
     fidx = fidx[sortind, :]
     lidx = lidx[sortind, :]
 
@@ -55,6 +61,10 @@ def stackPtsFiles(infiles, outfile, \
     else:
         outcol_loc = [[srcf_idx, i] for i in range(len(collist_list[srcf_idx]))]
         outcolidx_list = [[getIndex(cns, ucn) for ucn in collist_list[srcf_idx]] for cns in collist_list]
+
+    if update_col:
+        udcolidx_list = [[getIndex(cols, uc) for uc in ["return_number", "number_of_returns", "shot_number"]] for cols in collist_list]
+        uddata_list = [return_num.astype(int).astype(str), num_of_returns.astype(int).astype(str), shot_num.astype(int).astype(str)]
 
     out_header_str = "{0:s} ".format(comments) \
                      + delimiter.join([collist_list[ocl[0]][ocl[1]] for ocl in outcol_loc]) \
@@ -89,6 +99,9 @@ def stackPtsFiles(infiles, outfile, \
                 readlinenum_list[fnum] = lnum+1
                 templinenum_list[fnum] = lnum-1
             lineitems = linestr.split(delimiter)
+            if update_col:
+                for i, uci in enumerate(udcolidx_list[fnum]):
+                    lineitems[uci] = uddata_list[i][k]
             outlinestr = delimiter.join([lineitems[i] if i>-1 else fill_str for i in outcolidx_list[fnum]]) + "\n"
             outfobj.write(outlinestr)
             if verbose and (k % prgr_cnt_unit == 0):

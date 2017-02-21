@@ -27,7 +27,8 @@ def loadPoints(inptsfile, usecols=['x', 'y', 'z', \
                          comments=_dwel_points_ascii_scheme['comments'], \
                          delimiter=_dwel_points_ascii_scheme['delimiter'], \
                          skip_header=_dwel_points_ascii_scheme['skip_header'])
-    data = data.view(arr_dtype).reshape(data.shape+(-1,))
+    if len(data) > 0:
+        data = data.view(arr_dtype).reshape(data.shape+(-1,))
     return data
 
 def openMSC(mscfile):
