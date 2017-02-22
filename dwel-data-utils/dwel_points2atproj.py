@@ -286,53 +286,44 @@ def dwel_points2atproj(infile, outfile, \
     # plt.savefig(outpngfile+".png", dpi=dpi, bbox_inches="tight")
 
     if classflag:
-        mpl.image.imsave(outpngfile+".png", outimage_masked, dpi=dpi, \
-                             vmin=np.percentile(outimage[~np.isnan(outimage)], 2), \
-                             vmax=np.percentile(outimage[~np.isnan(outimage)], 98), \
-                             cmap=plt.get_cmap("RdYlGn"))
-
         # now write projection image to ENVI classification file
+        tmpflag = np.logical_not(np.isnan(outimage))
+        vmin=np.percentile(outimage[tmpflag], 2)
+        vmax=np.percentile(outimage[tmpflag], 98)
+        
         outimage[np.isnan(outimage)] = 0
-        outimage.astype(np.uint8)
+        outimage = outimage.astype(np.uint8)
+        cls_list = np.unique(outimage[tmpflag])
+        
+        cm_used = plt.get_cmap("jet", len(cls_list))
+        mpl.image.imsave(outpngfile+".png", outimage_masked, dpi=dpi, \
+                         vmin=vmin, vmax=vmax, \
+                         cmap=cm_used)
         outformat = "ENVI"
         driver = gdal.GetDriverByName(outformat)
         outds = driver.Create(outfile, outimage.shape[1], outimage.shape[0], 1, gdal.GDT_Byte)
-        outds.GetRasterBand(1).WriteArray(outimage)
+        outband = outds.GetRasterBand(1)
+        outband.WriteArray(outimage)
+        outband.SetCategoryNames(["0"] + ["{0:d}".format(int(cn)) for cn in cls_list])
+        outband.SetDescription("DWEL Classification")
+        outct = gdal.ColorTable()
+        color_table = np.vstack(( [0, 0, 0, 1], cm_used(range(len(cls_list))) ))
+        for i in range(len(color_table)):
+            outct.SetColorEntry(i, tuple((color_table[i, :]*255).astype(np.int)))
+        outband.SetColorTable(outct)
+        outband.FlushCache()
+
+        # ENVI meta data
+        envi_meta_dict = dict(projection_type="AT projection", \
+                              inputs_for_projection=infile, \
+                              create_time=time.strftime("%c"), \
+                              camera_height="{0:f}".format(camheight))
+        for kw in envi_meta_dict.keys():
+            outds.SetMetadataItem(kw, envi_meta_dict[kw], "ENVI")
         outds.FlushCache()
+        
         # close the dataset
         outds = None
-        # Now write envi header file manually. NOT by gdal...which can't do this
-        # job...  set header file
-        # get header file name
-        strlist = outfile.rsplit('.')
-        hdrfile = ".".join(strlist[0:-1]) + ".hdr"
-        if os.path.isfile(hdrfile):
-            os.remove(hdrfile)
-            print "Old header file removed: " + hdrfile 
-        hdrfile = outfile + ".hdr"
-        hdrstr = \
-            "ENVI\n" + \
-            "description = {\n" + \
-            "AT projection image of DWEL classification of point cloud, \n" + \
-            infile + ", \n" + \
-            "Create, [" + time.strftime("%c") + "], \n" + \
-            "Camera height for projection, {0:f}}}\n".format(camheight) + \
-            "samples = " + "{0:d}".format(outimage.shape[1]) + "\n" \
-            "lines = " + "{0:d}".format(outimage.shape[0]) + "\n" \
-            "bands = 1\n" + \
-            "header offset = 0\n" + \
-            "file type = ENVI classification\n" + \
-            "data type = 1\n" + \
-            "interleave = bsq\n" + \
-            "sensor type = Unknown\n" + \
-            "byte order = 0\n" + \
-            "wavelength units = unknown\n" + \
-            "band names = {DWEL Classification}\n" + \
-            "classes = 3\n" + \
-            "class names = {Unclassified, Others, Leaves}\n" + \
-            "class lookup = {0,  0,  0, 255,  0,  0,  0, 255,  0}"
-        with open(hdrfile, 'w') as hdrf:
-            hdrf.write(hdrstr)
     else:
         mpl.image.imsave(outpngfile+".png", outimage_masked, dpi=dpi, \
                              vmin=np.percentile(outimage[~np.isnan(outimage)], 2), \
