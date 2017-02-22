@@ -515,7 +515,8 @@ def dwel_points2hsproj(infile, outfile, \
             "description = {\n" + \
             "Hemispherical projection image of DWEL classification of point cloud, \n" + \
             infile + ", \n" + \
-            "Create, [" + time.strftime("%c") + "]}\n" + \
+            "Create, [" + time.strftime("%c") + "], \n" + \
+            "Camera height for projection, {0:f}}}\n".format(camheight) + \
             "samples = " + "{0:d}".format(outimage.shape[1]) + "\n" \
             "lines = " + "{0:d}".format(outimage.shape[0]) + "\n" \
             "bands = 1\n" + \
@@ -526,7 +527,7 @@ def dwel_points2hsproj(infile, outfile, \
             "sensor type = Unknown\n" + \
             "byte order = 0\n" + \
             "wavelength units = unknown\n" + \
-            "band names = {DWEL Classification " + os.path.basename(outfile)+ "}\n" + \
+            "band names = {DWEL Classification}\n" + \
             "classes = 3\n" + \
             "class names = {Unclassified, Others, Leaves}\n" + \
             "class lookup = {0,  0,  0, 255,  0,  0,  0, 255,  0}"
@@ -587,7 +588,8 @@ def dwel_points2hsproj(infile, outfile, \
         "description = {\n" + \
         "Hemispherical projection image of DWEL point cloud, \n" + \
         infile + ", \n" + \
-        "Create, [" + time.strftime("%c") + "]}\n" + \
+        "Create, [" + time.strftime("%c") + "], \n" + \
+        "Camera height for projection, {0:f}}}\n".format(camheight) + \
         "samples = {0:d}\n".format(outimage.shape[1]) + \
         "lines = {0:d}\n".format(outimage.shape[0]) + \
         "bands = {0:d}\n".format(nbands) + \

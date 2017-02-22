@@ -262,7 +262,6 @@ def dwel_points2atproj(infile, outfile, \
                 tmpu, tmpucounts = np.unique(tmppoints[:, cind['shotnum']], return_counts=True)
                 if np.count_nonzero(tmpucounts>1) > 0:
                     print "Error, maximum of each pulse are not select out properly"
-#            import pdb; pdb.set_trace()
             outimage[np.unravel_index(currentoutind, (nrows, ncols))] \
                 = np.asscalar(pixelfunc(np.array([tmppoints[:, pixelcol]])))
 
@@ -316,7 +315,8 @@ def dwel_points2atproj(infile, outfile, \
             "description = {\n" + \
             "AT projection image of DWEL classification of point cloud, \n" + \
             infile + ", \n" + \
-            "Create, [" + time.strftime("%c") + "]}\n" + \
+            "Create, [" + time.strftime("%c") + "], \n" + \
+            "Camera height for projection, {0:f}}}\n".format(camheight) + \
             "samples = " + "{0:d}".format(outimage.shape[1]) + "\n" \
             "lines = " + "{0:d}".format(outimage.shape[0]) + "\n" \
             "bands = 1\n" + \
@@ -327,7 +327,7 @@ def dwel_points2atproj(infile, outfile, \
             "sensor type = Unknown\n" + \
             "byte order = 0\n" + \
             "wavelength units = unknown\n" + \
-            "band names = {DWEL Classification " + os.path.basename(outfile)+ "}\n" + \
+            "band names = {DWEL Classification}\n" + \
             "classes = 3\n" + \
             "class names = {Unclassified, Others, Leaves}\n" + \
             "class lookup = {0,  0,  0, 255,  0,  0,  0, 255,  0}"
@@ -369,7 +369,8 @@ def dwel_points2atproj(infile, outfile, \
             "description = {\n" + \
             "AT projection image of DWEL point cloud, \n" + \
             infile + ", \n" + \
-            "Create, [" + time.strftime("%c") + "]}\n" + \
+            "Create, [" + time.strftime("%c") + "], \n" + \
+            "Camera height for projection, {0:f}}}\n".format(camheight) + \
             "samples = " + "{0:d}".format(outimage.shape[1]) + "\n" \
             "lines = " + "{0:d}".format(outimage.shape[0]) + "\n" \
             "bands = 2\n" + \
@@ -380,12 +381,9 @@ def dwel_points2atproj(infile, outfile, \
             "sensor type = Unknown\n" + \
             "byte order = 0\n" + \
             "wavelength units = unknown\n" + \
-            "band names = {DWEL points " + os.path.basename(outfile)+ ", mask}"
+            "band names = {pts_proj, mask}"
         with open(hdrfile, 'w') as hdrf:
             hdrf.write(hdrstr)
-        
-
-#    import pdb; pdb.set_trace()
 
     return 0
 
@@ -479,11 +477,8 @@ def main(cmdargs):
 def getCmdArgs():
     p = argparse.ArgumentParser(description="Generate an eqaul-angle projection image from a point cloud")
 
-    p.add_argument("-i", "--input", dest="infile", default="/projectnb/echidna/lidar/DWEL_Processing/HF2014/tmp-test-data/HFHD_20140919_C_1064_cube_bsfix_pxc_update_atp2_sdfac2_sievefac10_ptcl_points_small.txt", help="Input csv file of DWEL point cloud data")
-    p.add_argument("-o", "--output", dest="outfile", default="/projectnb/echidna/lidar/DWEL_Processing/HF2014/tmp-test-data/HFHD_20140919_C_1064_cube_bsfix_pxc_update_atp2_sdfac2_sievefac10_ptcl_points_small_atproj.img", help="Output hemispherical projection image")
-
-#        p.add_argument("-i", "--input", dest="infile", default=None, help="Input csv file of DWEL point cloud data")
-#        p.add_argument("-o", "--output", dest="outfile", default=None, help="Output AT projection image")
+    p.add_argument("-i", "--input", dest="infile", default=None, help="Input ASCII file of DWEL point cloud data")
+    p.add_argument("-o", "--output", dest="outfile", default=None, help="Output AT projection image")
 
     p.add_argument("-r", "--resolution", dest="outres", default=2.0, type=float, help="Resolution of projection image. Unit: mrad. Default: 2.0 mrad")
     p.add_argument("-H", "--camheight", dest="camheight", default=0.0, type=float, help="Height of camera/instrument relative to zero Z point of input point cloud. Unit: the same with input point cloud coordinates. Default: 0.0")
