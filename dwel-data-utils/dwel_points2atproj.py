@@ -246,16 +246,9 @@ def dwel_points2atproj(infile, outfile, \
                     +"{0:d}".format(p)
         # get points located in this pixel
         tmppoints = points[ptsinind[p:p+ptsoutcounts[p]], :]
-        # which point/points to be used in at-image pixel assingment
-        if tmppoints.shape[0] == 1:
-            # only one point inside this pixel, no need to call indexfunc to
-            # choose points. Assign attribute of this point to the pixel
-            outimage[np.unravel_index(currentoutind, (nrows, ncols))] \
-                = np.asscalar(pixelfunc(np.array([tmppoints[0, pixelcol]])))
-        else:
-            # more than one points in this pixel. call indexfunc to choose
-            # points to assign this pixel.
-            tmpind = indexfunc(tmppoints[:, indexcol])
+        # Call indexfunc to choose points to assign this pixel.
+        tmpind = indexfunc(tmppoints[:, indexcol])
+        if len(tmpind) > 0:
             tmppoints = tmppoints[tmpind, :]
             if debug and pulsemax:
                 # test
@@ -420,11 +413,14 @@ def main(cmdargs):
         indexfunc = np.argmin
     elif indexfuncname.upper() == "ALL":
         indexfunc = lambda x: np.arange(len(x))
+    elif indexfuncname.strip().find("lambda") == 0:
+        indexfunc = eval(indexfuncname)
     else:
         print "Error, cannot recognize the name of index function. Avaialbe, \n" \
             + "max: select the point/points with maximum value in a projected bin;\n" \
             + "min: select the point/points with minimum value in a projected bin;\n" \
-            + "all: use all points in a projected bin."
+            + "all: use all points in a projected bin;\n" \
+            + "string of python lambda function taking 1D numpy array and return 1D numpy array of select indices; using \"np\" as numpy module in the string."
         return ()
 
     # choose the function for pixel values:
@@ -475,9 +471,9 @@ def getCmdArgs():
     p.add_argument("-H", "--camheight", dest="camheight", default=0.0, type=float, help="Height of camera/instrument relative to zero Z point of input point cloud. Unit: the same with input point cloud coordinates. Default: 0.0")
     p.add_argument("--minzen", dest="minzen", default=0.0, type=float, help="Minimum zenith angle in the projection. Unit: deg. Default: 0.0 deg")
     p.add_argument("--maxzen", dest="maxzen", default=95.0, type=float, help="Maximum zenith angle in the projection. Unit: deg. Default: 95.0 deg")
-    p.add_argument("-x", "--index", dest="index", default=None, type=int, help="Column index of values used to decide which point/points in a projected bin will offer pixel values, with first column being 1. Default: 4.")
+    p.add_argument("-x", "--index", dest="index", default=None, type=int, help="Column index of values used to decide which point/points in a projected bin will offer pixel values, with first column being 1. Default: 4 if using all points within a projection bin to generate a pixel value.")
     p.add_argument("-p", "--pixel", dest="pixel", default=None, type=int, help="Column index of values used to assign pixel values, with first column being 1. Default: 16. Notice 'index' decides which point/points offer values to pixels. 'pixel' decides which attribute value of those points are assigned. 'index' and 'pixel' do NOT have to be the same.")
-    p.add_argument("--indexfunc", dest="indexfunc", choices=['max', 'min', 'all'], default="all", help="Function applied to 'index' column to decide which point/points in a projected bin will offer pixel values. Available, 'max', 'min', 'all'. If 'all', -x --index option will have no effect. Default: all")
+    p.add_argument("--indexfunc", dest="indexfunc", default="all", help="Function applied to 'index' column to decide which point/points in a projected bin will offer pixel values. Available, 'max', 'min', 'all', or a string of python lambda function. If 'all', -x --index option will have no effect. If a string of python lambda function, it must take a 1D numpy array and return a 1D numpy array of select indices, using \"np\" as numpy module in the string. Default: all")
     p.add_argument("--pixelfunc", dest="pixelfunc", choices=['direct', 'max', 'min', 'mean', 'mode', 'sum'], default="mode", help="Function applied to 'pixel' column to calculate a pixel value from select points by 'index' column and 'indexfunc'. Available, 'direct', 'max', 'min', 'mean', 'sum', 'mode'. Default: mode")
     p.add_argument("--cx", dest="cx", default=1, type=int, help="Column index of X coordinate, with first column being 1. Default: 1.")
     p.add_argument("--cy", dest="cy", default=2, type=int, help="Column index of Y coordinate, with first column being 1. Default: 2.")
