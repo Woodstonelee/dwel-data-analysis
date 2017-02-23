@@ -158,7 +158,7 @@ def dwel_points2hsproj2(infile, outfile, \
     
     # read points
     print "Loading points"
-    points = np.loadtxt(infile, dtype=np.float32, delimiter=',', skiprows=3)
+    points = np.loadtxt(infile, dtype=np.float32, delimiter=',', comments="//")
     # preprocess points
     if pulsemax:
         print "Selecting out maximum of each pulse"
@@ -339,7 +339,7 @@ def dwel_points2hsproj(infile, outfile, \
 
     # read points
     print "Loading points"
-    points = np.loadtxt(infile, dtype=np.float32, delimiter=',', skiprows=3)
+    points = np.loadtxt(infile, dtype=np.float32, delimiter=',', comments="//")
     # preprocess points
     if pulsemax:
         # Now the two indices are used only when pulsemax is switched on. 
