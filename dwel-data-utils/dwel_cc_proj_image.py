@@ -138,15 +138,17 @@ class CmdArgs:
     def __init__(self):
         p = optparse.OptionParser()
 
-        p.add_option("-n", "--nirfile", dest="nirfile", default="/projectnb/echidna/lidar/DWEL_Processing/HF2014/Hardwood20140503/spectral-points-by-union/HFHD20140503-dual-points/HFHD_20140503_C_dual_cube_bsfix_pxc_update_atp2_ptcl_points_nir_hsp2.img", help="Input projection image of DWEL scan at NIR band")
-        p.add_option("-s", "--swirfile", dest="swirfile", default="/projectnb/echidna/lidar/DWEL_Processing/HF2014/Hardwood20140503/spectral-points-by-union/HFHD20140503-dual-points/HFHD_20140503_C_dual_cube_bsfix_pxc_update_atp2_ptcl_points_swir_hsp2.img", help="Input projection image of DWEL scan at SWIR band")
-        p.add_option("-c", "--ccfile", dest="ccfile", default="/projectnb/echidna/lidar/DWEL_Processing/HF2014/Hardwood20140503/spectral-points-by-union/HFHD20140503-dual-points/HFHD_20140503_C_dual_cube_bsfix_pxc_update_atp2_ptcl_points_cc_hsp2.img", help="Output color composite image of DWEL scan")
+        p.add_option("-n", "--nirfile", dest="nirfile", default=None, help="Input projection image of DWEL scan at NIR band")
+        p.add_option("-s", "--swirfile", dest="swirfile", default=None, help="Input projection image of DWEL scan at SWIR band")
+        p.add_option("-c", "--ccfile", dest="ccfile", default=None, help="Output color composite image of DWEL scan")
 
         p.add_option("--nb", dest="nirband", default=1, type="int", help="Index of band in NIR image file for color composite image, with first band being 1. Default: 1")
         p.add_option("--sb", dest="swirband", default=1, type="int", help="Index of band in SWIR image file for color composite image, with first band being 1. Default: 1")
 
         p.add_option("--nm", dest="nirmask", default=2, type="int", help="Index of mask band in NIR image file for color composite image, with first band being 1. Default: 2")
         p.add_option("--sm", dest="swirmask", default=2, type="int", help="Index of mask band in SWIR image file for color composite image, with first band being 1. Default: 2")
+
+        p.add_option("--linear_strech_pct", dest="linear_strech_pct", type="float", default=2.0, help="Percentile, a% of pixel values for linear stretch, i.e. a% percentile to (100-a)% percentile of pixel values will be stretched to darkest to brightest. Default: 2.0")
 
         (options, args) = p.parse_args()
         self.__dict__.update(options.__dict__)
