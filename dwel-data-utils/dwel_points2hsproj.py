@@ -513,7 +513,7 @@ def dwel_points2hsproj(infile, outfile, \
         outband.FlushCache()
 
         # ENVI meta data
-        envi_meta_dict = dict(projection_type="AT projection", \
+        envi_meta_dict = dict(projection_type="Hemispherical projection", \
                               inputs_for_projection=infile, \
                               create_time=time.strftime("%c"), \
                               camera_height="{0:f}".format(camheight))
@@ -549,52 +549,36 @@ def dwel_points2hsproj(infile, outfile, \
     driver = gdal.GetDriverByName(outformat)
     nbands = 4
     outds = driver.Create(outfile, outimage.shape[1], outimage.shape[0], nbands, gdal.GDT_Float32)
-    outds.GetRasterBand(1).WriteArray(outimage)
+    outband = outds.GetRasterBand(1)
+    outband.WriteArray(outimage)
+    outband.SetDescription("Projection of DWEL points") # set band name
     outds.FlushCache()
     # write a mask band
     outimagemask = np.logical_not(outimagemask)
     outimagemask.astype(np.float32)
-    outds.GetRasterBand(2).WriteArray(outimagemask)
+    outband = outds.GetRasterBand(2)
+    outband.WriteArray(outimagemask)
+    outband.SetDescription("Mask")
     outds.FlushCache()
     # write number of points in a pixels selected to generate the assigned
     # pixel values.
-    outds.GetRasterBand(3).WriteArray(num_inpts)
+    outband = outds.GetRasterBand(3)
+    outband.WriteArray(num_inpts)
+    outband.SetDescription("Num points included for projection")
     outds.FlushCache()
-    outds.GetRasterBand(4).WriteArray(num_outpts)
+    outband = outds.GetRasterBand(4)
+    outband.WriteArray(num_outpts)
+    outband.SetDescription("Num points excluded for projection")
     outds.FlushCache()
+    # ENVI meta data
+    envi_meta_dict = dict(projection_type="Hemispherical projection", \
+                          inputs_for_projection=infile, \
+                          create_time=time.strftime("%c"), \
+                          camera_height="{0:f}".format(camheight))
+    for kw in envi_meta_dict.keys():
+        outds.SetMetadataItem(kw, envi_meta_dict[kw], "ENVI")
     # close the dataset
     outds = None
-    # Now write envi header file manually. NOT by gdal...which can't do this
-    # job...  set header file
-    # get header file name
-    strlist = outfile.rsplit('.')
-    hdrfile = ".".join(strlist[0:-1]) + ".hdr"
-    if os.path.isfile(hdrfile):
-        os.remove(hdrfile)
-        print "Old header file removed: " + hdrfile 
-    hdrfile = outfile + ".hdr"
-    hdrstr = \
-        "ENVI\n" + \
-        "description = {\n" + \
-        "Hemispherical projection image of DWEL point cloud, \n" + \
-        infile + ", \n" + \
-        "Create, [" + time.strftime("%c") + "], \n" + \
-        "Camera height for projection, {0:f}}}\n".format(camheight) + \
-        "samples = {0:d}\n".format(outimage.shape[1]) + \
-        "lines = {0:d}\n".format(outimage.shape[0]) + \
-        "bands = {0:d}\n".format(nbands) + \
-        "header offset = 0\n" + \
-        "file type = ENVI standard\n" + \
-        "data type = 4\n" + \
-        "interleave = bsq\n" + \
-        "sensor type = Unknown\n" + \
-        "byte order = 0\n" + \
-        "wavelength units = unknown\n" + \
-        "band names = {pts_proj, mask, num_inpts, num_outpts}"
-    with open(hdrfile, 'w') as hdrf:
-        hdrf.write(hdrstr)
-
-#    import pdb; pdb.set_trace()
 
     return 0
 

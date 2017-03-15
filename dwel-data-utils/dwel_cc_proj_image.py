@@ -59,19 +59,25 @@ def main(cmdargs):
     swirds = None
 
     mask = np.logical_and(nirmask, swirmask)
+    inv_mask = np.logical_not(mask)
+    nirdata[inv_mask] = 255
+    swirdata[inv_mask] = 255
 
     # Generate RGB information with 2% linear stretch, default setting in ENVI
     nirrgb = image_stretch(nirdata, mask, 2)
     swirrgb = image_stretch(swirdata, mask, 2)
-    darkrgb = np.zeros_like(swirrgb)
-    alphargb = np.zeros_like(swirrgb)
-    alphargb[mask] = 255
+    nirrgb[inv_mask] = 255
+    swirrgb[inv_mask] = 255
+    darkrgb = np.zeros_like(swirrgb) + 255 # white background
+    darkrgb[mask] = 0
+    alphargb = np.zeros_like(swirrgb) + 255
     # create dark blue band
-    darkdata = np.zeros_like(swirdata, dtype=np.float32)
+    darkdata = np.zeros_like(swirdata, dtype=np.float32) + 255 # white background
+    darkdata[mask] = 0
 
     print "Write color composite image"
 
-    dpi = 72
+    dpi = 300
     outimage = np.dstack((swirrgb, nirrgb, darkrgb, alphargb))
     outpngfile = ".".join(ccfile.split('.')[:-1])+".png"
     mpl.image.imsave(outpngfile, outimage, dpi=dpi, format='png')
@@ -80,43 +86,27 @@ def main(cmdargs):
     outformat = "ENVI"
     driver = gdal.GetDriverByName(outformat)
     outds = driver.Create(ccfile, darkdata.shape[1], darkdata.shape[0], 3, gdal.GDT_Float32)
-    outds.GetRasterBand(1).WriteArray(swirdata)
+    outband = outds.GetRasterBand(1)
+    outband.WriteArray(swirdata)
+    outband.SetDescription("SWIR")
     outds.FlushCache()
-    outds.GetRasterBand(2).WriteArray(nirdata)
+    outband = outds.GetRasterBand(2)
+    outband.WriteArray(nirdata)
+    outband.SetDescription("NIR")
     outds.FlushCache()
-    outds.GetRasterBand(3).WriteArray(darkdata)
+    outband = outds.GetRasterBand(3)
+    outband.WriteArray(darkdata)
+    outband.SetDescription("Dark constant")
     outds.FlushCache()
+    # ENVI meta data
+    envi_meta_dict = dict(create_time=time.strftime("%c"), \
+                          source_files="{{{0:s}, \n{1:s}}}".format(swirfile, nirfile), \
+                          source_bands="{{{0:d}, \n{1:d}}}".format(sbind, nbind))
+    for kw in envi_meta_dict.keys():
+        outds.SetMetadataItem(kw, envi_meta_dict[kw], "ENVI")
+
     # close the dataset
     outds = None
-    # Now write envi header file manually. NOT by gdal...which can't do this
-    # job...  set header file
-    # get header file name
-    strlist = ccfile.rsplit('.')
-    hdrfile = ".".join(strlist[0:-1]) + ".hdr"
-    if os.path.isfile(hdrfile):
-        os.remove(hdrfile)
-        print "Old header file removed: " + hdrfile 
-    hdrfile = ccfile + ".hdr"
-    hdrstr = \
-        "ENVI\n" + \
-        "description = {\n" + \
-        "Color composite projection image of DWEL data from, \n" + \
-        nirfile + ", \n" + \
-        swirfile + ", \n" + \
-        "Create, [" + time.strftime("%c") + "]}\n" + \
-        "samples = " + "{0:d}".format(darkdata.shape[1]) + "\n" \
-        "lines = " + "{0:d}".format(darkdata.shape[0]) + "\n" \
-        "bands = 3\n" + \
-        "header offset = 0\n" + \
-        "file type = ENVI standard\n" + \
-        "data type = 4\n" + \
-        "interleave = bsq\n" + \
-        "sensor type = Unknown\n" + \
-        "byte order = 0\n" + \
-        "wavelength units = unknown\n" + \
-        "band names = {SWIR, NIR, DARK}"
-    with open(hdrfile, 'w') as hdrf:
-        hdrf.write(hdrstr)
 
 def image_stretch(image, mask, q):
     validpix = image[mask]
