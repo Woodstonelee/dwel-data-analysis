@@ -658,7 +658,7 @@ class DWELClassProfile:
         tmpy[0] = 0
         tmpy[-1] = 0
         # make sure the integral of finite Gaussian pulse model is FWHM
-        print "error in Gaussian pulse model = {0:.6f}".format(np.sum(tmpy)*self.rgres - fwhm)
+        print "Residual error in Gaussian pulse model = {0:.6f}".format(np.sum(tmpy)*self.rgres - fwhm)
         return {'numbins':len(tmpx), 'x':tmpx, 'y':tmpy, 'peakbin':np.argmax(tmpy)}
 
     def gaussianPulse(self, amp, rg, ngmodel):
