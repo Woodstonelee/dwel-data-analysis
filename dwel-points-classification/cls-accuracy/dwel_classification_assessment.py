@@ -118,24 +118,6 @@ def main(cmdargs):
 
     classcode = np.array(primary_errmat_pixel_counts.index)
     if imgfiles is not None:
-        npts_list = [ getSampleNumPts(imgf, prow, pcol, inptsB=inptsB, outptsB=outptsB) for imgf, prow, pcol in itertools.izip(imgfiles, pixel_row_list, pixel_col_list) ]
-        class_npts_list, nonclass_npts_list = zip(*npts_list)
-        primary_errmat_point_counts = \
-            estErrorMatrix_Pixel2Points(np.hstack(class_label_list).astype(np.int), \
-                                        np.hstack(primary_label_list).astype(np.int), \
-                                        np.hstack(class_npts_list).astype(np.int), \
-                                        np.hstack(nonclass_npts_list).astype(np.int), \
-                                        pixel_weights=weights)
-
-        secondary_errmat_point_counts = \
-            estErrorMatrix_Pixel2Points(np.hstack(class_label_list).astype(np.int), \
-                                        np.hstack(secondary_label_list).astype(np.int), \
-                                        np.hstack(class_npts_list).astype(np.int), \
-                                        np.hstack(nonclass_npts_list).astype(np.int), \
-                                        pixel_weights=weights)
-
-        mean_errmat_point_counts = (primary_errmat_point_counts + secondary_errmat_point_counts)*0.5
-
         tmp = [ getTotalNumPts(clsf, imgf, classcode, inptsB=inptsB, outptsB=outptsB, \
                                pixelcount=True, pixelarea=True, zerozen=zerozen, pixelres=inresolution) \
                 for clsf, imgf in itertools.izip(clsfiles, imgfiles) ]
@@ -143,14 +125,40 @@ def main(cmdargs):
         total_npts = np.sum(np.array(total_npts_list), axis=0)
         total_npixel = np.sum(np.array(npixel_list), axis=0).astype(np.float)
         total_pixelarea = np.sum(np.array(pixelarea_list), axis=0)
+        
+        # inclusion probability of each pixel for primary labels
+        n_i_dot = np.array([np.sum(class_label_list==cls) for cls in classcode])
+        tmp = total_npixel / n_i_dot
+        pixel_weights = weights * np.array([tmp[np.where(classcode==cll)[0][0]] for cll in np.hstack(class_label_list).astype(np.int)])
+        # normalize the pixel_weights such that the total number of
+        # points from the pixels will remain unchanged.
+        pixel_weights = pixel_weights / np.sum(pixel_weights)
+
+        npts_list = [ getSampleNumPts(imgf, prow, pcol, inptsB=inptsB, outptsB=outptsB) for imgf, prow, pcol in itertools.izip(imgfiles, pixel_row_list, pixel_col_list) ]
+        class_npts_list, nonclass_npts_list = zip(*npts_list)
+        primary_errmat_point_counts = \
+            estErrorMatrix_Pixel2Points(np.hstack(class_label_list).astype(np.int), \
+                                        np.hstack(primary_label_list).astype(np.int), \
+                                        np.hstack(class_npts_list).astype(np.int), \
+                                        np.hstack(nonclass_npts_list).astype(np.int), \
+                                        pixel_weights=pixel_weights)
+
+        secondary_errmat_point_counts = \
+            estErrorMatrix_Pixel2Points(np.hstack(class_label_list).astype(np.int), \
+                                        np.hstack(secondary_label_list).astype(np.int), \
+                                        np.hstack(class_npts_list).astype(np.int), \
+                                        np.hstack(nonclass_npts_list).astype(np.int), \
+                                        pixel_weights=pixel_weights)
+
+        mean_errmat_point_counts = (primary_errmat_point_counts + secondary_errmat_point_counts)*0.5
 
         primary_errmat_pixel_counts = ErrorMatrixSummary(primary_errmat_pixel_counts, total_npixel)
         secondary_errmat_pixel_counts = ErrorMatrixSummary(secondary_errmat_pixel_counts, total_npixel)
         mean_errmat_pixel_counts = ErrorMatrixSummary(mean_errmat_pixel_counts, total_npixel)
 
-        primary_errmat_pixel_area = ErrorMatrixSummary(primary_errmat_pixel_area, total_pixelarea)
-        secondary_errmat_pixel_area = ErrorMatrixSummary(secondary_errmat_pixel_area, total_pixelarea)
-        mean_errmat_pixel_area = ErrorMatrixSummary(mean_errmat_pixel_area, total_pixelarea) 
+        primary_errmat_pixel_area = ErrorMatrixSummary(primary_errmat_pixel_area, total_npixel)
+        secondary_errmat_pixel_area = ErrorMatrixSummary(secondary_errmat_pixel_area, total_npixel)
+        mean_errmat_pixel_area = ErrorMatrixSummary(mean_errmat_pixel_area, total_npixel) 
 
         primary_errmat_point_counts = ErrorMatrixSummary(primary_errmat_point_counts, total_npts)
         secondary_errmat_point_counts = ErrorMatrixSummary(secondary_errmat_point_counts, total_npts)
@@ -241,12 +249,67 @@ def main(cmdargs):
             outfobj.write("\n")
 
 
-def ErrorMatrixSummary(errmat, Ni):
+def ErrorMatrixSummary(con_mat_samp, cls_strata_size):
     """
-    Ni: total number of classified points in each class
+    con_mat_samp, pandas DataFrame: Nclass x Nclass, error matrix in terms of
+    pixel/point counts directly from the samples without
+    poststratified correction. rows are mapped, columns are reference.
+
+    cls_strata_size, 1D numpy array: total number of classified points
+    in each class used to calculate the proportion of each stratum, or
+    you can provide the proportion of each stratum directly.
     """
-    errmat_summary = errmat.copy()
-    Ni = Ni.astype(np.float)
+    errmat = con_mat_samp.copy()
+    con_mat_samp = errmat.values
+
+    n_cls = len(con_mat_samp)
+    cls_npix = cls_strata_size
+    cls_w = cls_npix / float(np.sum(cls_npix))
+
+    # calcualte population confusion matrix in terms of area proportion
+    n_i_dot = np.sum(con_mat_samp, axis=1)
+    con_mat_pop = np.tile((cls_w / n_i_dot).reshape((n_cls, 1)), (1, n_cls)) * con_mat_samp
+
+    # calcualte user's accuracy
+    p_i_dot = np.sum(con_mat_pop, axis=1)
+    U = np.array([con_mat_pop[i, i]/p_i_dot[i] for i in range(n_cls)])
+    # calculate user's accuracy standard error
+    SU = np.sqrt(U * (1. - U) / (n_i_dot-1))
+
+    # calculate overall accuracy
+    OA = reduce(lambda x, y: x+y, [con_mat_pop[i, i] for i in range(n_cls)])
+    SO = np.sqrt(np.sum(cls_w**2 * U * (1.-U) / (n_i_dot-1)))
+
+    # calculate producer's accuracy
+    p_dot_j = np.sum(con_mat_pop, axis=0)
+    P = np.array([con_mat_pop[i, i]/p_dot_j[i] for i in range(n_cls)])
+    # calculate producer's accuracy standard error
+    N_i_dot = cls_npix
+    N_dot_j = np.tile((N_i_dot / n_i_dot.astype(float)).reshape((n_cls, 1)), (1, n_cls)) * con_mat_samp
+    N_dot_j = np.sum(N_dot_j, axis=0)
+    term1 = N_i_dot**2 * (1-P)**2 * U * (1.-U) / (n_i_dot - 1)
+
+    term2 = N_i_dot**2 / n_i_dot.astype(float)
+    term2 = np.tile(term2.reshape((n_cls, 1)), (1, n_cls)) * con_mat_samp
+    term2 = term2 * (1 - con_mat_samp / np.tile(n_i_dot.reshape((n_cls, 1)), (1, n_cls)))
+    term2 = term2 / np.tile(n_i_dot.reshape((n_cls, 1)), (1, n_cls))
+    for i in range(n_cls):
+        term2[i, i] = 0
+    term2 = np.sum(term2, axis=0) * P**2
+    SP = np.sqrt((term1 + term2) / N_dot_j**2)
+
+    # calculate estimated proportion of area for classes adjusted for 
+    # classification error based on our reference data
+    p_dot_k = np.sum(con_mat_pop, axis=0)
+    # calculate the standard error of the estimated area proportion
+    tmp = np.tile(cls_w.reshape((n_cls, 1)), (1, n_cls)) * con_mat_pop - con_mat_pop**2
+    tmp = tmp / (np.tile(n_i_dot.reshape((n_cls, 1)), (1, n_cls)) - 1)
+    tmp = np.sum(tmp, axis=0)
+    Sp_dot_k = np.sqrt(tmp)
+
+    errmat_summary = pd.DataFrame(errmat, copy=True)
+    oldindex = errmat.index.tolist()
+    errmat_summary.loc[oldindex, oldindex] = con_mat_pop
     errmat_summary['Ui'] = np.zeros(errmat_summary.shape[0])
     errmat_summary['S(Ui)'] = np.zeros(errmat_summary.shape[0])
     tmpdf = pd.DataFrame([np.zeros(errmat_summary.shape[1]), np.zeros(errmat_summary.shape[1])], columns=errmat_summary.columns)
@@ -259,39 +322,48 @@ def ErrorMatrixSummary(errmat, Ni):
     errmat_summary.index.names = [None]
 
     # user's accuracy and its variance
-    for cls in errmat.index:
-        ni = np.sum(errmat_summary.loc[cls, errmat.columns])
-        errmat_summary.loc[cls, 'Ui'] = errmat_summary.loc[cls, cls]/ni
-        errmat_summary.loc[cls, 'S(Ui)'] = np.sqrt(errmat_summary.loc[cls, 'Ui']*(1-errmat_summary.loc[cls, 'Ui'])/(ni-1))
-
+    errmat_summary.loc[oldindex, 'Ui'] = U
+    errmat_summary.loc[oldindex, 'S(Ui)'] = SU
     # producer's accuracy and its variance
-    ni = np.sum(errmat, axis=1)
-    nj = np.sum(errmat, axis=0)
-    nij_to_ni = errmat/np.tile(ni, (2, 1)).T
-    Nj = nij_to_ni * np.tile(Ni, (2, 1)).T
-    Nj = np.sum(Nj, axis=0)
-    for truth in errmat.columns:
-        errmat_summary.loc['Pj', truth] = errmat_summary.loc[truth, truth]/np.sum(errmat_summary.loc[errmat.index, truth])
-
-        tmpbool = errmat.index!=truth
-        tmp_nij_to_ni = nij_to_ni.loc[tmpbool, truth]
-        VPj = Ni[tmpbool]**2*tmp_nij_to_ni*(1-tmp_nij_to_ni)/(ni[tmpbool]-1)
-        VPj = np.sum(VPj)
-        VPj = VPj * errmat_summary.loc['Pj', truth]**2
-
-        leftVPj = Nj.loc[truth]**2*(1-errmat_summary.loc['Pj', truth])**2
-        leftVPj = leftVPj*errmat_summary.loc[truth, 'Ui']*(1-errmat_summary.loc[truth, 'Ui'])
-        leftVPj = leftVPj/(nj.loc[truth]-1)
-        VPj = (VPj + leftVPj)/Nj.loc[truth]**2
-
-        errmat_summary.loc['S(Pj)', truth] = np.sqrt(VPj)
-
+    errmat_summary.loc['Pj', oldindex] = P
+    errmat_summary.loc['S(Pj)', oldindex] =SP
     # overall accuracy and its variance
-    errmat_summary.loc['Pj', 'Ui'] = np.sum(np.diagonal(errmat))/np.sum(errmat.as_matrix())
-    Wi = Ni/np.sum(Ni)
-    VO = Wi**2*errmat_summary.loc[errmat.index, 'Ui']*(1-errmat_summary.loc[errmat.index, 'Ui'])/(ni-1)
-    VO = np.sum(VO)
-    errmat_summary.loc['S(Pj)', 'S(Ui)'] = np.sqrt(VO)
+    errmat_summary.loc['Pj', 'Ui'] = OA
+    errmat_summary.loc['S(Pj)', 'S(Ui)'] = SO
+
+    # for cls in errmat.index:
+    #     errmat_summary.loc[cls, 'Ui'] = U
+    #     errmat_summary.loc[cls, 'S(Ui)'] = np.sqrt(errmat_summary.loc[cls, 'Ui']*(1-errmat_summary.loc[cls, 'Ui'])/(ni-1))
+
+    # # producer's accuracy and its variance
+    # ni = np.sum(errmat, axis=1)
+    # nj = np.sum(errmat, axis=0)
+    # nij_to_ni = errmat/np.tile(ni, (2, 1)).T
+    # Nj = nij_to_ni * np.tile(Ni, (2, 1)).T
+    # Nj = np.sum(Nj, axis=0)
+    # for truth in errmat.columns:
+    #     errmat_summary.loc['Pj', truth] = errmat_summary.loc[truth, truth]/np.sum(errmat_summary.loc[errmat.index, truth])
+
+    #     tmpbool = errmat.index!=truth
+    #     tmp_nij_to_ni = nij_to_ni.loc[tmpbool, truth]
+    #     VPj = Ni[tmpbool]**2*tmp_nij_to_ni*(1-tmp_nij_to_ni)/(ni[tmpbool]-1)
+    #     VPj = np.sum(VPj)
+    #     VPj = VPj * errmat_summary.loc['Pj', truth]**2
+
+    #     leftVPj = Nj.loc[truth]**2*(1-errmat_summary.loc['Pj', truth])**2
+    #     leftVPj = leftVPj*errmat_summary.loc[truth, 'Ui']*(1-errmat_summary.loc[truth, 'Ui'])
+    #     leftVPj = leftVPj/(nj.loc[truth]-1)
+    #     VPj = (VPj + leftVPj)/Nj.loc[truth]**2
+
+    #     errmat_summary.loc['S(Pj)', truth] = np.sqrt(VPj)
+
+    # # overall accuracy and its variance
+    # errmat_summary.loc['Pj', 'Ui'] = np.sum(np.diagonal(errmat))/np.sum(errmat.as_matrix())
+    # Wi = Ni/np.sum(Ni)
+    # VO = Wi**2*errmat_summary.loc[errmat.index, 'Ui']*(1-errmat_summary.loc[errmat.index, 'Ui'])/(ni-1)
+    # VO = np.sum(VO)
+    # errmat_summary.loc['S(Pj)', 'S(Ui)'] = np.sqrt(VO)
+
     return errmat_summary
 
 def getTotalNumPts(clsfile, imgfile, classcode, maskB=2, inptsB=3, outptsB=4, \
