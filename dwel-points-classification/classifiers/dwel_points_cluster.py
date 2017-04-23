@@ -14,7 +14,11 @@ from sklearn.cluster import MiniBatchKMeans, Birch
 from sklearn.ensemble import RandomTreesEmbedding
 from sklearn.decomposition import IncrementalPCA
 
-import canupo
+# add parent folder to Python path
+addpath = os.path.dirname(os.path.abspath("."))
+if addpath not in sys.path:
+    sys.path.append(addpath)
+import utils.dwel_points_utils as dpu
 
 class DWELPointsCluster:
     """
@@ -74,8 +78,8 @@ class DWELPointsCluster:
 
         print "Running KMeans clustering on spatial data only ..."
 
-        mscfobj = self.openMSC(mscfile)
-        mscheader = mscfobj.get_header()
+        mscfobj = dpu.openMSC(mscfile)
+        mscheader = mscfobj.header
 
         nscales = len(mscheader[1])
         if use_scales is None:
@@ -99,7 +103,7 @@ class DWELPointsCluster:
             print "\tPCA of MSC spatial data ..."
             ipca = IncrementalPCA(n_components=len(use_scales))
             for i in xrange(niter):
-                mscdata = self.readMSC(mscfobj, use_scales)
+                mscdata = mscfobj.read(npts=self.mbk.pf_npts, use_scales=use_scales)
                 mscbool = self.validhit_bool[mscdata[:, -1].astype(int)-1]
                 if np.sum(mscbool) == 0:
                     if self.verbose:
@@ -115,10 +119,10 @@ class DWELPointsCluster:
         # incrementally
         print
         print "\tTraining preprocessing scaler for MSC spatial data ..."
-        mscfobj.read_reset()
+        mscfobj.next_pt_idx = 0
         scaler = StandardScaler()
         for i in xrange(niter):
-            mscdata = self.readMSC(mscfobj, use_scales)
+            mscdata = mscfobj.read(npts=self.mbk.pf_npts, use_scales=use_scales)
             mscbool = self.validhit_bool[mscdata[:, -1].astype(int)-1]
             if np.sum(mscbool) == 0:
                 if self.verbose:
@@ -136,10 +140,10 @@ class DWELPointsCluster:
         # Train the mini-batch KMeans
         print
         print "\tTraining the mini-batch KMeans cluster ..."
-        mscfobj.read_reset()
+        mscfobj.next_pt_idx = 0
         mbk = MiniBatchKMeans(n_clusters=n_clusters)
         for i in xrange(niter):
-            mscdata = self.readMSC(mscfobj, use_scales)
+            mscdata = mscfobj.read(npts=self.mbk.pf_npts, use_scales=use_scales)
             mscbool = self.validhit_bool[mscdata[:, -1].astype(int)-1]
             if np.sum(mscbool) == 0:
                 if self.verbose:
@@ -160,9 +164,9 @@ class DWELPointsCluster:
         print "\tPredicting mini-batch KMeans clustering labels ..."
         # Rewind the MSC file object to read points from the
         # beginning.
-        mscfobj.read_reset()
+        mscfobj.next_pt_idx = 0
         for i in xrange(niter):
-            mscdata = self.readMSC(mscfobj, use_scales)
+            mscdata = mscfobj.read(npts=self.mbk.pf_npts, use_scales=use_scales)
             mscbool = self.validhit_bool[mscdata[:, -1].astype(int)-1]
             if np.sum(mscbool) == 0:
                 if self.verbose:
@@ -177,6 +181,8 @@ class DWELPointsCluster:
             mem = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / rusage_denom
             sys.stdout.write("{0:d} / {1:d}: {2:.2f}\n".format(i, niter, mem))
 
+        mscfobj.close()
+
     def ssKmeans(self, n_clusters, spectralptsfile, mscfile, use_scales=None):
         """
         Use mini-batch KMeans clustering on both spectral and spatial data.
@@ -189,8 +195,8 @@ class DWELPointsCluster:
 
         print "Running KMeans clustering on both spectral and spatial data ..."
 
-        mscfobj = canupo.MSCFile(self.mscfile)
-        mscheader = mscfobj.get_header()
+        mscfobj = dpu.openMSC(mscfile)
+        mscheader = mscfobj.header
 
         nscales = len(mscheader[1])
         if use_scales is None:
@@ -213,10 +219,10 @@ class DWELPointsCluster:
         # incrementally
         print
         print "\tTraining preprocessing scaler for spectral and MSC spatial data ..."
-        mscfobj.read_reset()
+        mscfobj.next_pt_idx = 0
         scaler = StandardScaler()
         for i in xrange(niter):
-            mscdata = self.readMSC(mscfobj, use_scales)
+            mscdata = mscfobj.read(npts=self.mbk.pf_npts, use_scales=use_scales)
             mscbool = self.validhit_bool[mscdata[:, -1].astype(int)-1]
             if np.sum(mscbool) == 0:
                 if self.verbose:
@@ -232,10 +238,10 @@ class DWELPointsCluster:
         if pca_flag:
             # Transform the data with PCA
             print "\tPCA of spectral and MSC spatial data ..."
-            mscfobj.read_reset()
+            mscfobj.next_pt_idx = 0
             ipca = IncrementalPCA(n_components=len(use_scales)+points.shape[1])
             for i in xrange(niter):
-                mscdata = self.readMSC(mscfobj, use_scales)
+                mscdata = mscfobj.read(npts=self.mbk.pf_npts, use_scales=use_scales)
                 mscbool = self.validhit_bool[mscdata[:, -1].astype(int)-1]
                 if np.sum(mscbool) == 0:
                     if self.verbose:
@@ -255,10 +261,10 @@ class DWELPointsCluster:
         # Train the mini-batch KMeans
         print
         print "\tTraining the mini-batch KMeans cluster ..."
-        mscfobj.read_reset()
+        mscfobj.next_pt_idx = 0
         mbk = MiniBatchKMeans(n_clusters=n_clusters)
         for i in xrange(niter):
-            mscdata = self.readMSC(mscfobj, use_scales)
+            mscdata = mscfobj.read(npts=self.mbk.pf_npts, use_scales=use_scales)
             mscbool = self.validhit_bool[mscdata[:, -1].astype(int)-1]
             if np.sum(mscbool) == 0:
                 if self.verbose:
@@ -279,9 +285,9 @@ class DWELPointsCluster:
         print "\tPredicting mini-batch KMeans clustering labels ..."
         # Rewind the MSC file object to read points from the
         # beginning.
-        mscfobj.read_reset()
+        mscfobj.next_pt_idx = 0
         for i in xrange(niter):
-            mscdata = self.readMSC(mscfobj, use_scales)
+            mscdata = mscfobj.read(npts=self.mbk.pf_npts, use_scales=use_scales)
             mscbool = self.validhit_bool[mscdata[:, -1].astype(int)-1]
             if np.sum(mscbool) == 0:
                 if self.verbose:
@@ -295,6 +301,8 @@ class DWELPointsCluster:
             
             mem = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / rusage_denom
             sys.stdout.write("{0:d} / {1:d}: {2:.2f}\n".format(i, niter, mem))
+
+        mscfobj.close()
         
     def spaBIRCH(self, n_clusters, spectralptsfile, mscfile, use_scales=None):
         """
@@ -308,8 +316,8 @@ class DWELPointsCluster:
 
         print "Running BIRCH clustering on spatial data only ..."
         
-        mscfobj = canupo.MSCFile(self.mscfile)
-        mscheader = mscfobj.get_header()
+        mscfobj = dpu.openMSC(mscfile)
+        mscheader = mscfobj.header
 
         nscales = len(mscheader[1])
         if use_scales is None:
@@ -333,7 +341,7 @@ class DWELPointsCluster:
             print "\tPCA of MSC spatial data ..."
             ipca = IncrementalPCA(n_components=len(use_scales))
             for i in xrange(niter):
-                mscdata = self.readMSC(mscfobj, use_scales)
+                mscdata = mscfobj.read(npts=self.birch.pf_npts, use_scales=use_scales)
                 mscbool = self.validhit_bool[mscdata[:, -1].astype(int)-1]
                 if np.sum(mscbool) == 0:
                     if self.verbose:
@@ -349,10 +357,10 @@ class DWELPointsCluster:
         # incrementally
         print
         print "\tTraining preprocessing scaler for MSC spatial data ..."
-        mscfobj.read_reset()
+        mscfobj.next_pt_idx = 0
         scaler = StandardScaler()
         for i in xrange(niter):
-            mscdata = self.readMSC(mscfobj, use_scales)
+            mscdata = mscfobj.read(npts=self.birch.pf_npts, use_scales=use_scales)
             mscbool = self.validhit_bool[mscdata[:, -1].astype(int)-1]
             if np.sum(mscbool) == 0:
                 if self.verbose:
@@ -370,10 +378,10 @@ class DWELPointsCluster:
         # Train the BIRCH
         print
         print "\tTraining the BIRCH cluster ..."
-        mscfobj.read_reset()
+        mscfobj.next_pt_idx = 0
         brc = Birch(n_clusters=n_clusters)
         for i in xrange(niter):
-            mscdata = self.readMSC(mscfobj, use_scales)
+            mscdata = mscfobj.read(npts=self.birch.pf_npts, use_scales=use_scales)
             mscbool = self.validhit_bool[mscdata[:, -1].astype(int)-1]
             if np.sum(mscbool) == 0:
                 if self.verbose:
@@ -394,9 +402,9 @@ class DWELPointsCluster:
         print "\tPredicting BIRCH clustering labels ..."
         # Rewind the MSC file object to read points from the
         # beginning.
-        mscfobj.read_reset()
+        mscfobj.next_pt_idx = 0
         for i in xrange(niter):
-            mscdata = self.readMSC(mscfobj, use_scales)
+            mscdata = mscfobj.read(npts=self.birch.pf_npts, use_scales=use_scales)
             mscbool = self.validhit_bool[mscdata[:, -1].astype(int)-1]
             if np.sum(mscbool) == 0:
                 if self.verbose:
@@ -411,7 +419,8 @@ class DWELPointsCluster:
             mem = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / rusage_denom
             sys.stdout.write("{0:d} / {1:d}: {2:.2f}\n".format(i, niter, mem))
                                                   
-            
+        mscfobj.close()
+
     def specBIRCH(self, n_clusters, spectralptsfile):
         """
         Use BIRCH clustering on spectral data only.
@@ -499,61 +508,6 @@ class DWELPointsCluster:
 
         # self.data = data
         return points
-    
-    def openMSC(self, mscfile):
-        """
-        Open an MSC file and set up some attributes for the class
-        """
-        mscfobj = canupo.MSCFile(mscfile)
-        return mscfobj
-
-    def readMSC(self, mscfobj, use_scales=None, npts=None):
-        """
-        Read data from MSC file, one batch at one time, number of
-        points to read on every call, self.birch.pf_npts
-        """
-        mscheader = mscfobj.get_header()
-        nscales = len(mscheader[1])        
-        # ncols = 2*nscales + 1
-        if npts is None:
-            npts = self.birch.pf_npts
-        if npts is None:
-            warnings.warn("Number of points to read from MSC is not specified, read ONE point now.", RuntimeWarning)
-            npts = 1
-        tmp = mscheader[0] - mscfobj.next_pt_idx
-        if tmp < npts:
-            npts = tmp
-
-        if use_scales is None:
-            use_scales = np.arange(nscales)
-        else:
-            if np.any(use_scales >= nscales):
-                sys.stderr.write("Indices to scales out of bound, {0:d} scales in input MSC\n".format(nscales))
-                return None
-            if np.any(use_scales < 0):
-                sys.stderr.write("Indices to scales out of bound, negative indices found")
-                return None
-
-        n_use_scales = len(use_scales)
-        mscdata = np.zeros([npts, 2*n_use_scales+1])
-
-        tmp = mscfobj.read_point(npts)
-        mscdata[:, 0:n_use_scales] = np.array(tmp[1]).reshape(npts, nscales)[:, use_scales]
-        mscdata[:, n_use_scales:2*n_use_scales] = np.array(tmp[2]).reshape(npts, nscales)[:, use_scales]
-        mscdata[:, -1] = np.array(tmp[0]).reshape(npts, mscheader[-1])[:, -1]
-
-        # for i in xrange(npts):
-        #     tmp = mscfobj.read_point()
-        #     mscdata[i, :] = np.hstack(tmp[1:])
-            # # debugging
-            # if np.sum(np.fabs(tmp[0][0:3]-self.data[tmp[-1]-1, -3:])) > 1e-5*3:
-            #     print i
-            #     print np.sum(np.fabs(tmp[0][0:3]-self.data[tmp[-1]-1, -3:]))
-            #     print tmp[0][0:3]
-            #     print self.data[tmp[-1]-1, -3:]
-            #     raise RuntimeError("MSC point does not match original point")
-
-        return mscdata
         
     
     def writeClusterLabels(self, outfile, multiout=False):

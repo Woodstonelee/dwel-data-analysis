@@ -8,7 +8,11 @@ import itertools
 
 import numpy as np
 
-import dwel_points_utils as dpu
+# add parent folder to Python path
+addpath = os.path.dirname(os.path.abspath("."))
+if addpath not in sys.path:
+    sys.path.append(addpath)
+import utils.dwel_points_utils as dpu
 
 def getSkipLines(ptsfile, skip_header=0, comments="//"):
     with open(ptsfile) as fobj:

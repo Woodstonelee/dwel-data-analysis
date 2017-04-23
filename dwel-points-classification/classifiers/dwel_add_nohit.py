@@ -7,13 +7,16 @@ Created: Tue Oct 25 22:14:25 EDT 2016
 """
 
 import sys
+import os
 import argparse
 import itertools
 import warnings
 
 import numpy as np
 
-import dwel_points_utils as dpu
+# add parent folder to Python path
+sys.path.append(os.path.dirname(os.path.abspath(".")))
+import utils.dwel_points_utils as dpu
 
 def stackPtsFiles(infiles, outfile, \
                   srcf_idx="union", fill_str="-9999", \

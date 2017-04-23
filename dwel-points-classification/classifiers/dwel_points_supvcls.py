@@ -1,4 +1,5 @@
 import sys
+import os
 
 import itertools
 
@@ -8,7 +9,11 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.cross_validation import train_test_split
 from sklearn import cross_validation
 
-import dwel_points_utils as dpu
+# add parent folder to Python path
+addpath = os.path.dirname(os.path.abspath("."))
+if addpath not in sys.path:
+    sys.path.append(addpath)
+import utils.dwel_points_utils as dpu
 
 class DWELPointsClassifier:
     """
