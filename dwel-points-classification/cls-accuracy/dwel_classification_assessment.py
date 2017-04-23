@@ -451,9 +451,10 @@ def calcErrorMatrix(class_label, truth_label, weights=None):
 
     truth_label (1D numpy array, int): labels of ground truth
 
-    weights (1D numpy array, float): weights of each pair of class and truth in
-    the calculation of error matrix, e.g. area represented by each
-    pixel/points. default: all weights are one.
+    weights (1D numpy array, float): weights of each pair of class and
+    truth in the calculation of error matrix, e.g. area represented by
+    each pixel/points, or inverse of inclusion probability. default:
+    all weights are one.
     """
 
     tmpclass = np.unique(class_label)
@@ -493,7 +494,15 @@ def estErrorMatrix_Pixel2Points(class_label, truth_label, class_npts, nonclass_n
     errmat = pd.DataFrame(data=np.zeros((nclass, nclass)), index=class_code, columns=class_code)
     if pixel_weights is None:
         pixel_weights = np.ones_like(class_label)
-    weights = (class_npts + nonclass_npts) * pixel_weights
+    # Though each pixel may have different number of points, we treat
+    # each pixel as if there is the same number of points, e.g. 100,
+    # to avoid the bias in error matrix estimate caused by those
+    # pixels with large numbers of points. Therefore, weights is not
+    # multiplied with number of points in each pixel but directly the
+    # inclusion probability of each pixel. In other words, the error
+    # matrix in points for each pixel is normalized by its number of
+    # points in the pixel.
+    weights = pixel_weights # * (class_npts + nonclass_npts)
     npts_class = np.zeros(2)
     for i, (c, t, cn, ncn) in enumerate(itertools.izip(class_label, truth_label, class_npts, nonclass_npts)):
         tmpind = np.where(class_code == c)[0]
@@ -501,6 +510,10 @@ def estErrorMatrix_Pixel2Points(class_label, truth_label, class_npts, nonclass_n
         npts_class[1-tmpind] = ncn
         truth_label_ind = np.where(class_code == t)[0]
         errmat += estPtsErrorMatrix(npts_class, truth_label_ind)*weights[i]
+
+    # total number of point samples
+    npts_total = np.sum(class_npts) + np.sum(nonclass_npts)
+    errmat = errmat / np.sum(errmat.values)*npts_total
 
     return errmat
 

@@ -73,6 +73,13 @@ def getCmdArgs():
     pgapnorm = p.add_argument_group(title="Pgap by normalization", description="Estimate Pgap from apparent reflectance by normalizing integral of apparent reflectance to 0-1")
     pgapnorm.add_argument("--normpgap", dest="normpgap", default=False, action="store_true", help=("Estimate Pgap by normalizing integral of apparent reflectance to 0-1. If you set --normpgap option to use normalization to estimate Pgap, default scaling method and its thresholds will be ignored. Default: false."))
 
+    ptscls = p.add_argument_group(title="Point classification Information", description="Information about point classification, such as accuracy for adjustment of Pgap estimates")
+    ptscls.add_argument("--errorAdjustedPgap", dest="err_adj_pgap", default=False, action="store_true", help="If set, adjust Pgap according to point classification errors given by user's and producer's accuracies.")
+    ptscls.add_argument("--leafU", dest="leafU", type=float, nargs="+", metavar="User's accuracy for leaves", help="User's accuracy for leaf points. If one value given, the same accuracy is assigned to both NIR and SWIR point classification accuracy. If two values given, first for NIR points and the second for SWIR.")
+    ptscls.add_argument("--leafP", dest="leafP", type=float, nargs="+", metavar="Producer's accuracy for leaves", help="Producer's accuracy for leaf points. If one value given, the same accuracy is assigned to both NIR and SWIR point classification accuracy. If two values given, first for NIR points and the second for SWIR.")
+    ptscls.add_argument("--woodU", dest="woodU", type=float, nargs="+", metavar="User's accuracy for woody materials", help="User's accuracy for wood points. If one value given, the same accuracy is assigned to both NIR and SWIR point classification accuracy. If two values given, first for NIR points and the second for SWIR.")
+    ptscls.add_argument("--woodP", dest="woodP", type=float, nargs="+", metavar="Producer's accuracy for woody materials", help="Producer's accuracy for wood points. If one value given, the same accuracy is assigned to both NIR and SWIR point classification accuracy. If two values given, first for NIR points and the second for SWIR.")
+
     p.add_argument("-p","--plot", dest="plot", default=False, action="store_true", help=("Plot resulting vertical profile. Default False."))
     p.add_argument("--savetemp", dest="savetemp", default=False, action="store_true", help=("Save intermediate variables to a temporary numpy data file (npz) for next time faster processing. File names are automatically generated according to --outprefix option. Default False."))
     p.add_argument("--usetemp", dest="usetemp", default=False, action="store_true", help=("Read and use intermediate variables from a saved numpy data file (npz) for next time faster processing. File names are automatically generated according to --outprefix option. Default False."))
@@ -87,6 +94,11 @@ def getCmdArgs():
     if (cmdargs.nirfile is None) or (cmdargs.swirfile is None):
         p.print_help()
         print("Input SPD filenames must be set.")
+        sys.exit()
+
+    if (cmdargs.err_adj_pgap) and ((cmdargs.leafU is None) or (cmdargs.leafP is None) or (cmdargs.woodU is None) or (cmdargs.woodP is None)):
+        p.print_help()
+        print("User's and producer's accuracies for both leaf and woody point classification are needed to adjust Pgap according to classification errors!")
         sys.exit()
     
     return cmdargs
@@ -186,6 +198,43 @@ def main(cmdargs):
         woodIalim = cmdargs.woodIalim
         plantIalim = cmdargs.plantIalim
 
+    if cmdargs.err_adj_pgap:
+        clsU = dict()
+        clsP = dict()
+        if len(cmdargs.leafU) == 1:
+            clsU["leaf_nir"] = cmdargs.leafU[0]
+            clsU["leaf_swir"] = cmdargs.leafU[0]
+        elif len(cmdargs.leafU) == 2:
+            clsU["leaf_nir"] = cmdargs.leafU[0]
+            clsU["leaf_swir"] = cmdargs.leafU[1]
+        else:
+            raise RuntimeError("Only up to 2 values accepted for the option --leafU")
+        if len(cmdargs.leafP) == 1:
+            clsP["leaf_nir"] = cmdargs.leafP[0]
+            clsP["leaf_swir"] = cmdargs.leafP[0]
+        elif len(cmdargs.leafP) == 2:
+            clsP["leaf_nir"] = cmdargs.leafP[0]
+            clsP["leaf_swir"] = cmdargs.leafP[1]
+        else:
+            raise RuntimeError("Only up to 2 values accepted for the option --leafP")
+        if len(cmdargs.woodU) == 1:
+            clsU["wood_nir"] = cmdargs.woodU[0]
+            clsU["wood_swir"] = cmdargs.woodU[0]
+        elif len(cmdargs.woodU) == 2:
+            clsU["wood_nir"] = cmdargs.woodU[0]
+            clsU["wood_swir"] = cmdargs.woodU[1]
+        else:
+            raise RuntimeError("Only up to 2 values accepted for the option --woodU")
+        if len(cmdargs.woodP) == 1:
+            clsP["wood_nir"] = cmdargs.woodP[0]
+            clsP["wood_swir"] = cmdargs.woodP[0]
+        elif len(cmdargs.woodP) == 2:
+            clsP["wood_nir"] = cmdargs.woodP[0]
+            clsP["wood_swir"] = cmdargs.woodP[1]
+        else:
+            raise RuntimeError("Only up to 2 values accepted for the option --woodP")
+
+
     print("Initiating object of foliage profile ...")
     nirprofileobj = spddwelprofile.DWELClassProfile(cmdargs.nirfile, 'NIR', \
                                                     zenithbinsize=cmdargs.binsize, \
@@ -243,6 +292,11 @@ def main(cmdargs):
     print "Getting Pgap profile along canopy height at different zenith angles ..."
     nirpgapprofiles = nirprofileobj.getPgapProfileClass(nirPgapZenRgView, nirsensorheight)
     swirpgapprofiles = swirprofileobj.getPgapProfileClass(swirPgapZenRgView, swirsensorheight)
+
+    if cmdargs.err_adj_pgap:
+        print "Adjusting Pgap profiles along canopy height according to point classification error ..."
+        nirpgapprofiles = nirprofileobj.adjustPgapProfileClass(nirpgapprofiles, clsU, clsP)
+        swirpgapprofiles = swirprofileobj.adjustPgapProfileClass(swirpgapprofiles, clsU, clsP)
 
     # print "Testing height profile of wood to leaf ratio at different zenith angles ..."
     # nirwood2leaf, zeniths, heights = nirprofileobj.getWoodToLeafProfile(nirpgapprofiles)

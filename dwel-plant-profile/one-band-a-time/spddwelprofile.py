@@ -8,6 +8,8 @@ AUTHORS:
 
 import sys, os
 import time
+import warnings
+
 import numpy as np
 
 import matplotlib as mpl
@@ -386,6 +388,48 @@ class DWELClassProfile:
                 plt.close(fig)
 
         return profileview.copy()
+
+    def adjustPgapProfileClass(self, PgapProfileClass, U, P):
+        """
+        Adjust Pgap profile for each class stored in the
+        PgapProfileClass dict variable according to the user's and
+        producer's accuracies, U and P.
+
+        Parameters:
+
+            U, P (dict): user's and producer's accuracies, dict labels
+            for the class names corresponding to the Pgap class names. 
+        """
+        PhitTotal = 0
+        for name in PgapProfileClass['classname']:
+            if name not in U.keys() or name not in P.keys():
+                raise RuntimeError("No user's or producer's accuracy found for Pgap class {0:s}. Skip!".format(name))
+            PhitTotal = PhitTotal + (1 - PgapProfileClass[name])
+        woodcnt = 0
+        leafcnt = 0
+        for name in PgapProfileClass['classname']:
+            if name.find("wood") > -1:
+                woodlabel = name
+                woodcnt = woodcnt + 1
+            if name.find("leaf") > -1:
+                leaflabel = name
+                leafcnt = leafcnt + 1
+        if woodcnt==0:
+            raise RuntimeError("No Pgap profile for wood is found!")
+        if woodcnt>1:
+            raise RuntimeError("Ambiguous Pgap profile for wood!")
+        if leafcnt==0:
+            raise RuntimeError("No Pgap profile for leaf is found!")
+        if leafcnt>1:
+            raise RuntimeError("Ambiguous Pgap profile for leaf!")
+        tmpidx = np.where(PgapProfileClass[woodlabel] == 1)
+        ratio = (1 - PgapProfileClass[woodlabel]) * U[woodlabel] * P[leaflabel]
+        ratio = (1 - PgapProfileClass[leaflabel]) * U[leaflabel] * P[woodlabel] / ratio
+        ratio[tmpidx] = 0
+        PgapProfileClass[woodlabel] = 1 - PhitTotal / (1 + ratio)
+        PgapProfileClass[leaflabel] = 1 - (PhitTotal - PhitTotal / (1 + ratio))
+
+        return PgapProfileClass
 
     
     def getPgapProfileClass(self, PgapZenRgView, sensorheight):
