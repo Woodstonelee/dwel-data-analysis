@@ -5,18 +5,21 @@ labels of points according to classification accuracy.
 """
 
 import sys
+import os
 import argparse
 
 import itertools
 
 import numpy as np
 
+# add parent folder to Python path
+addpath = os.path.dirname(os.path.abspath("."))
+if addpath not in sys.path:
+    sys.path.append(addpath)
+import utils.dwel_points_utils as dpu
+
 def getCmdArgs():
     p = argparse.ArgumentParser(description="Generate a resample of classification of a DWEL point cloud.")
-
-    # p.add_argument("-i", "--infile", dest="infile", default="/projectnb/echidna/lidar/DWEL_Processing/HF2014/Hardwood20140919/spectral-points-by-union/HFHD_20140919_dual_points-clustering/merging/HFHD_20140919_C_dual_cube_bsfix_pxc_update_atp2_ptcl_points_kmeans_canupo_class.txt", help="Input ASCII file of DWEL classified point cloud.")
-    # p.add_argument("-o", "--outfile", dest="outfile", default="/projectnb/echidna/lidar/zhanli86/tmp/HFHD_20140919_C_dual_cube_bsfix_pxc_update_atp2_ptcl_points_kmeans_canupo_class_resample.txt", help="Output ASCII file of resampled classification")
-    # p.add_argument("--useraccuracy", dest="useraccuracy", nargs='+', type=float, default=(0.733, 0.756), help="User's accuracy of each class listed in the classcode.")
 
     p.add_argument("-i", "--infile", dest="infile", default=None, help="Input ASCII file of DWEL classified point cloud.")
     p.add_argument("-o", "--outfile", dest="outfile", default=None, help="Output ASCII file of resampled classification")
@@ -42,15 +45,15 @@ def resample_unknown_class(cmdargs):
     classcode = cmdargs.classcode
     useraccuracy = cmdargs.useraccuracy
 
-    # get meta data for reading ascii point cloud file
-    with open(infile, 'r') as infobj:
-        for i, line in enumerate(infobj):
-            if i==2:
-                headerstr_list = line.strip('\r\n ').split(',')
-                cind = { hstr.strip():i for i, hstr in enumerate(headerstr_list) }
-                break
+    # # get meta data for reading ascii point cloud file
+    # with open(infile, 'r') as infobj:
+    #     for i, line in enumerate(infobj):
+    #         if i==2:
+    #             headerstr_list = line.strip('\r\n ').split(',')
+    #             cind = { hstr.strip():i for i, hstr in enumerate(headerstr_list) }
+    #             break
 
-    class_label = np.loadtxt(infile, comments=None, delimiter=',', skiprows=3, usecols=[cind['class']])
+    class_label = dpu.loadPoints(infile, usecols=['class']).squeeze()
     class_label = class_label.astype(np.int)
     classcode = np.array(classcode).astype(np.int)
 
@@ -60,15 +63,15 @@ def resample_known_class(cmdargs):
     classcode = cmdargs.classcode
     useraccuracy = cmdargs.useraccuracy
 
-    # get meta data for reading ascii point cloud file
-    with open(infile, 'r') as infobj:
-        for i, line in enumerate(infobj):
-            if i==2:
-                headerstr_list = line.strip('\r\n ').split(',')
-                cind = { hstr.strip():i for i, hstr in enumerate(headerstr_list) }
-                break
+    # # get meta data for reading ascii point cloud file
+    # with open(infile, 'r') as infobj:
+    #     for i, line in enumerate(infobj):
+    #         if i==2:
+    #             headerstr_list = line.strip('\r\n ').split(',')
+    #             cind = { hstr.strip():i for i, hstr in enumerate(headerstr_list) }
+    #             break
 
-    class_label = np.loadtxt(infile, comments=None, delimiter=',', skiprows=3, usecols=[cind['class']])
+    class_label = dpu.loadPoints(infile, usecols=['class']).squeeze()
     class_label = class_label.astype(np.int)
     classcode = np.array(classcode).astype(np.int)
     class_ind_list = [ np.where(class_label==c)[0] for c in classcode ]
@@ -83,13 +86,34 @@ def resample_known_class(cmdargs):
     
     with open(infile, 'r') as infobj, open(outfile, 'w') as outfobj:
         sys.stdout.write("Write resampled classification\n")
+
+        for i in range(dpu._dwel_points_ascii_scheme["skip_header"]):
+            line = infobj.readline()
+            outfobj.write(line)
+
+        line = infobj.readline()
+        linestr_list = line.strip().lstrip(dpu._dwel_points_ascii_scheme["comments"]).split(dpu._dwel_points_ascii_scheme["delimiter"])
+        linestr_list = [lstr.strip() for lstr in linestr_list]
+        class_colidx = len(linestr_list)
+        outlist = [None for i in range(class_colidx)]
+        try:
+            class_colidx = linestr_list.index("class")
+            line = dpu._dwel_points_ascii_scheme["delimiter"].join(linestr_list) + "\n"
+        except ValueError:
+            line = dpu._dwel_points_ascii_scheme["delimiter"].join(linestr_list) + ",class\n"
+            outlist.append(None)
+        outfobj.write(dpu._dwel_points_ascii_scheme["comments"]+line)
+
+        lineoffset = 0
         for i, line in enumerate(infobj):
-            if i<3:
+            if line.strip().find(dpu._dwel_points_ascii_scheme["comments"])>-1:
                 outfobj.write(line)
+                lineoffset = lineoffset + 1
             else:
-                linestr_list = line.strip('\r\n ').split(',')
-                linestr_list[cind['class']] = "{0:d}".format(class_label[i-3])
-                newline = ",".join(linestr_list) + "\n"
+                linestr_list = line.strip().split(dpu._dwel_points_ascii_scheme["delimiter"])
+                outlist[0:len(linestr_list)] = linestr_list
+                outlist[class_colidx] = "{0:d}".format(class_label[i-lineoffset])
+                newline = dpu._dwel_points_ascii_scheme["delimiter"].join(outlist) + "\n"
                 outfobj.write(newline)
 
 def main(cmdargs):
