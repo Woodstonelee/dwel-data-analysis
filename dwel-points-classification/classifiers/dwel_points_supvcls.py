@@ -10,7 +10,7 @@ from sklearn.cross_validation import train_test_split
 from sklearn import cross_validation
 
 # add parent folder to Python path
-addpath = os.path.dirname(os.path.abspath("."))
+addpath = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 if addpath not in sys.path:
     sys.path.append(addpath)
 import utils.dwel_points_utils as dpu
