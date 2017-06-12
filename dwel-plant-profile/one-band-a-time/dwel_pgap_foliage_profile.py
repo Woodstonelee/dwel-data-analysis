@@ -39,10 +39,6 @@ def getCmdArgs():
 
     p = argparse.ArgumentParser(description=("Generate foliage/woody profiles from a DWEL scan in SPD files."))
 
-    # p.add_argument("-n","--nirfile", dest="nirfile", default="/projectnb/echidna/lidar/DWEL_Processing/HF2014/tmp-test-data/HFHD_20140919_C_dual_cube_bsfix_pxc_update_atp2_ptcl_points_class_NDI_thresh_0.550_small_nir.spd", help=("Input SPD file of NIR scan"))
-    # p.add_argument("-s","--swirfile", dest="swirfile", default="/projectnb/echidna/lidar/DWEL_Processing/HF2014/tmp-test-data/HFHD_20140919_C_dual_cube_bsfix_pxc_update_atp2_ptcl_points_class_NDI_thresh_0.550_small_swir.spd", help=("Input SPD file of SWIR scan"))
-    # p.add_argument("-o","--outprefix", dest="outprefix", default="/projectnb/echidna/lidar/DWEL_Processing/HF2014/tmp-test-data/dwelprofiletest/hfhd_20140919_c_dual", help=("Prefix including a full path to a directory for writing multiple output files"))
-
     p.add_argument("-n","--nirfile", dest="nirfile", default="/projectnb/echidna/lidar/DWEL_Processing/HF2014/Hardwood20140503/spectral-points-by-union/HFHD20140503-dual-points-clustering/merging/HFHD_20140503_C_dual_cube_bsfix_pxc_update_atp2_ptcl_points_kmeans_canupo_class_nohitfixed_nir.spd", help=("Input SPD file of NIR scan"))
     p.add_argument("-s","--swirfile", dest="swirfile", default="/projectnb/echidna/lidar/DWEL_Processing/HF2014/Hardwood20140503/spectral-points-by-union/HFHD20140503-dual-points-clustering/merging/HFHD_20140503_C_dual_cube_bsfix_pxc_update_atp2_ptcl_points_kmeans_canupo_class_nohitfixed_swir.spd", help=("Input SPD file of SWIR scan"))
     p.add_argument("-o","--outprefix", dest="outprefix", default="/projectnb/echidna/lidar/DWEL_Processing/HF2014/Hardwood20140503/spectral-points-by-union/HFHD20140503-dual-points-clustering-profiles/pgap-by-scaling/hfhd_20140503_c_dual", help=("Prefix including a full path to a directory for writing multiple output files, WITHOUT underscore in the end"))
@@ -143,7 +139,7 @@ def plotDualPlantProfileClass(nirplantprofileclass, swirplantprofileclass, outfi
     else:
         plt.show()
 
-def writeMeta(cmdargs):
+def writeMeta(cmdargs, clsU=None, clsP=None):
     """
     Write input parameters for pgap and plant profile calculation to a text
     file.
@@ -176,13 +172,26 @@ def writeMeta(cmdargs):
                 mf.write("Ia_lim of plants, leaf and wood together (min, max) = None, None\n")
             else:
                 mf.write("Ia_lim of plants, leaf and wood together (min, max) = {0:.3f}, {1:.3f}\n".format(cmdargs.plantIalim[0], cmdargs.plantIalim[1]))
+        mf.write("\n")
+        if cmdargs.savetemp:
+            mf.write("2D view of Pgap will be generated via synthesizing waveforms from point cloud for leaves and woodies\n")
+        if cmdargs.usetemp:
+            mf.write("2D view of Pgap will be read and used from previously saved npz file\n")
+        mf.write("\n")
+        if cmdargs.err_adj_pgap:
+            mf.write("Pgap profiles will be adjusted according to point classification error\n")
+            mf.write("NIR,U,P\n")
+            mf.write("Wood,{0:.3f},{1:.3f}\n".format(clsU["wood_nir"], clsP["wood_nir"]))
+            mf.write("Leaf,{0:.3f},{1:.3f}\n".format(clsU["leaf_nir"], clsP["leaf_nir"]))
+            mf.write("SWIR,U,P\n")
+            mf.write("Wood,{0:.3f},{1:.3f}\n".format(clsU["wood_swir"], clsP["wood_swir"]))
+            mf.write("Leaf,{0:.3f},{1:.3f}\n".format(clsU["leaf_swir"], clsP["leaf_swir"]))
+
 
 def main(cmdargs):
     """
     Run the TLS foliage profile
     """
-    # write meta data
-    writeMeta(cmdargs)
     
     print "Input NIR: {0:s}".format(cmdargs.nirfile)
     print "Input SWIR: {0:s}".format(cmdargs.swirfile)
@@ -198,6 +207,8 @@ def main(cmdargs):
         woodIalim = cmdargs.woodIalim
         plantIalim = cmdargs.plantIalim
 
+    clsU=None
+    clsP=None
     if cmdargs.err_adj_pgap:
         clsU = dict()
         clsP = dict()
@@ -234,6 +245,8 @@ def main(cmdargs):
         else:
             raise RuntimeError("Only up to 2 values accepted for the option --woodP")
 
+    # write meta data
+    writeMeta(cmdargs, clsU=clsU, clsP=clsP)
 
     print("Initiating object of foliage profile ...")
     nirprofileobj = spddwelprofile.DWELClassProfile(cmdargs.nirfile, 'NIR', \
