@@ -8,6 +8,7 @@ import numpy as np
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.cross_validation import train_test_split
 from sklearn import cross_validation
+from sklearn import metrics
 
 # add parent folder to Python path
 addpath = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
@@ -84,6 +85,15 @@ class DWELPointsClassifier:
         cv_train_X, cv_test_X, cv_train_y, cv_test_y = train_test_split(train_X, train_y, test_size=0.25, stratify=train_y)
         rf.fit(cv_train_X, cv_train_y)
         print "Cross validation with 25% stratified samples in the test: {0:3f}".format(rf.score(cv_test_X, cv_test_y))
+        # calculate confusion matrix
+        cv_test_yhat = rf.predict(cv_test_X)
+        cv_cm = metrics.confusion_matrix(cv_test_y, cv_test_yhat, labels=class_labels)
+        cm_labels = [str(i+1) for i in range(len(cv_cm))] if class_labels is None else [str(i) for i in class_labels]
+        print "Confusion matrix from cross validation: "
+        print           "," + "Prediction"
+        print "Truth" + "," + ",".join(cm_labels)
+        for i, cl in enumerate(cm_labels):
+            print cl + "," + ",".join([str(x) for x in cv_cm[i, :]])
         
         # train RF
         print "Training Random Forest with all training data samples ..."
