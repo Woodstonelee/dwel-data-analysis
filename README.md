@@ -17,25 +17,25 @@ The tools and programs for DWEL data analysis here are written and developed in 
 
 Programs are grouped into different folders based on their functionality and data categories they are fed with. *Folders keep growing and more tools will be added.* The current folders and description of their functionality and purposes are listed in the following sections.
 
-├── dwel-data-utils: Programs that are not specific for DWEL's dual-wavelength data but universal for any lidar waveform and point cloud. 
-├── dwel-plant-profile: Estimate gap probability (Pgap) from DWEL *discrete ponits* and then plant profiles.
-│   ├── obsolete: Not used.
-│   ├── one-band-a-time: Estimation from each band separately.
-│   └── two-bands-a-time: Not used.
-├── dwel-points-analysis: Programs that take in and process DWEL point cloud data stored in *discrete points*.
-│   ├── dwel-points2dem
-│   ├── dwel-points-modeling
-│   └── dwel-points-registration
-├── dwel-points-classification: Classify points from DWEL scans and accuracy assessments.
-│   ├── classifiers
-│   ├── cls-accuracy
-│   ├── ground-filter
-│   ├── obsolete: Not used.
-│   └── utils
-├── dwel-spectral-points-generation: Generate a bispectral point cloud from two monospectral DWEL point cloud files.
-└── dwel-waveform-analysis: Programs that take in and process DWEL waveform data stored in *ENVI data cube*.
-    ├── dwel-ndi
-    └── dwel-wf-misc
++ dwel-data-utils: Programs that are not specific for DWEL's dual-wavelength data but universal for any lidar waveform and point cloud. 
++ dwel-plant-profile: Estimate gap probability (Pgap) from DWEL *discrete ponits* and then plant profiles.
+  - obsolete: Not used.
+  - one-band-a-time: Estimation from each band separately.
+  - two-bands-a-time: Not used.
++ dwel-points-analysis: Programs that take in and process DWEL point cloud data stored in *discrete points*.
+  - dwel-points2dem
+  - dwel-points-modeling
+  - dwel-points-registration
++ dwel-points-classification: Classify points from DWEL scans and accuracy assessments.
+  - classifiers
+  - cls-accuracy
+  - ground-filter
+  - obsolete: Not used.
+  - utils
++ dwel-spectral-points-generation: Generate a bispectral point cloud from two monospectral DWEL point cloud files.
++ dwel-waveform-analysis: Programs that take in and process DWEL waveform data stored in *ENVI data cube*.
+  - dwel-ndi
+  - dwel-wf-misc
 
 ---
 
